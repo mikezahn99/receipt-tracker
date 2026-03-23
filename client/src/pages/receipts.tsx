@@ -7,7 +7,7 @@
  * Filters: date range, job, category (Fuel / Other).
  */
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Receipt, Job } from "@shared/schema";
@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,18 @@ export default function ReceiptsPage() {
   const [jobFilter, setJobFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
+    const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    merchant: "",
+    purchaseDate: "",
+    total: "",
+    category: "Other",
+    gallons: "",
+    jobId: "",
+    notes: "",
+  });
+  
   // Build query string from filters
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -83,6 +96,43 @@ export default function ReceiptsPage() {
     if (!text) return "—";
     if (text.length <= maxLength) return text;
     return `${text.slice(0, maxLength)}...`;
+  };
+    const handleEditClick = (receipt: Receipt) => {
+    setEditingReceiptId(receipt.id);
+    setEditForm({
+      merchant: receipt.merchant || "",
+      purchaseDate: receipt.purchaseDate || "",
+      total: receipt.total != null ? String(receipt.total) : "",
+      category: receipt.category || "Other",
+      gallons: receipt.gallons != null ? String(receipt.gallons) : "",
+      jobId: String(receipt.jobId),
+      notes: receipt.notes || "",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditOpen(false);
+    setEditingReceiptId(null);
+    setEditForm({
+      merchant: "",
+      purchaseDate: "",
+      total: "",
+      category: "Other",
+      gallons: "",
+      jobId: "",
+      notes: "",
+    });
+  };
+
+  const handleEditFormChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
   
   const handleDelete = async (id: number) => {
@@ -257,8 +307,11 @@ export default function ReceiptsPage() {
   </span>
 </TableCell>
 
-<TableCell>
-  <button onClick={() => handleDelete(r.id)}>Delete</button>
+                      <TableCell>
+  <div className="flex items-center gap-3">
+    <button onClick={() => handleEditClick(r)}>Edit</button>
+    <button onClick={() => handleDelete(r.id)}>Delete</button>
+  </div>
 </TableCell>
                     </TableRow>
                     ))}
@@ -276,6 +329,119 @@ export default function ReceiptsPage() {
           )}
         </CardContent>
       </Card>
+            {isEditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Edit Receipt</h3>
+              <button onClick={handleCloseEdit} className="text-sm text-muted-foreground">
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium">Merchant</label>
+                <Input
+                  name="merchant"
+                  value={editForm.merchant}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Purchase Date</label>
+                <Input
+                  type="date"
+                  name="purchaseDate"
+                  value={editForm.purchaseDate}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Total</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  name="total"
+                  value={editForm.total}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Category</label>
+                <Select
+                  value={editForm.category}
+                  onValueChange={(value) =>
+                    setEditForm((prev) => ({ ...prev, category: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Fuel">Fuel</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Gallons</label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  name="gallons"
+                  value={editForm.gallons}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium">Job</label>
+                <Select
+                  value={editForm.jobId}
+                  onValueChange={(value) =>
+                    setEditForm((prev) => ({ ...prev, jobId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a job..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allJobs?.map((job) => (
+                      <SelectItem key={job.id} value={String(job.id)}>
+                        {job.jobName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium">Notes</label>
+                <Textarea
+                  name="notes"
+                  value={editForm.notes}
+                  onChange={handleEditFormChange}
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button variant="outline" onClick={handleCloseEdit}>
+                Cancel
+              </Button>
+              <Button disabled>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
