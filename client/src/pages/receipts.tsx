@@ -209,7 +209,8 @@ export default function ReceiptsPage() {
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Total</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
                     <TableHead>Actions</TableHead>
-                </TableHeader>
+                    </TableRow> 
+                  </TableHeader>                
                 <TableBody>
                   {receipts.map((r) => (
                     <TableRow key={r.id} data-testid={`receipt-row-${r.id}`}>
