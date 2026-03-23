@@ -22,7 +22,8 @@ import fs from "fs";
 
 // ── File upload configuration ───────────────
 // Uploaded receipt images are saved to ./uploads/
-const uploadsDir = path.join(process.cwd(), "uploads");
+const dataDir = process.env.DATA_DIR || process.cwd();
+const uploadsDir = path.join(dataDir, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
