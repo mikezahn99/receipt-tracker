@@ -189,7 +189,21 @@ export async function registerRoutes(
       return res.status(500).json({ message: err.message });
     }
   });
+  app.delete("/api/receipts/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const deleted = await storage.deleteReceipt(id);
 
+    if (!deleted) {
+      return res.status(404).json({ message: "Receipt not found" });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete receipt error:", error);
+    return res.status(500).json({ message: "Failed to delete receipt" });
+  }
+});
   /** PATCH /api/jobs/:id – update job name or status */
   app.patch("/api/jobs/:id", async (req, res) => {
     try {
