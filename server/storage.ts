@@ -18,6 +18,7 @@ export interface IStorage {
   }): Promise<Receipt[]>;
   getReceipt(id: number): Promise<Receipt | undefined>;
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
+  updateReceipt(id: number, receipt: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: number): Promise<boolean>;
 }
 
@@ -261,7 +262,51 @@ class SQLiteStorage implements IStorage {
 
     return created;
   }
+  
+    async updateReceipt(
+    id: number,
+    receipt: Partial<InsertReceipt>
+  ): Promise<Receipt | undefined> {
+    const existing = await this.getReceipt(id);
+    if (!existing) return undefined;
 
+    const nextMerchant = receipt.merchant ?? existing.merchant;
+    const nextPurchaseDate = receipt.purchaseDate ?? existing.purchaseDate;
+    const nextTotal = receipt.total ?? existing.total;
+    const nextCategory = receipt.category ?? existing.category;
+    const nextGallons = receipt.gallons ?? existing.gallons;
+    const nextJobId = receipt.jobId ?? existing.jobId;
+    const nextNotes = receipt.notes ?? existing.notes;
+
+    sqlite
+      .prepare(
+        `
+        UPDATE receipts
+        SET
+          merchant = ?,
+          purchase_date = ?,
+          total = ?,
+          category = ?,
+          gallons = ?,
+          job_id = ?,
+          notes = ?
+        WHERE id = ?
+        `
+      )
+      .run(
+        nextMerchant,
+        nextPurchaseDate,
+        nextTotal,
+        nextCategory,
+        nextGallons,
+        nextJobId,
+        nextNotes,
+        id
+      );
+
+    return this.getReceipt(id);
+  }
+  
   async deleteReceipt(id: number): Promise<boolean> {
     const result = sqlite
       .prepare(
