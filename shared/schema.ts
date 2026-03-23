@@ -11,6 +11,28 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // ────────────────────────────────────────────
+// USERS TABLE
+// Simple login accounts for foremen/admin.
+// ────────────────────────────────────────────
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("user"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+// ────────────────────────────────────────────
+
 // JOBS TABLE
 // Each job represents a project/contract that expenses can be assigned to.
 // ────────────────────────────────────────────
