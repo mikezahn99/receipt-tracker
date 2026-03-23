@@ -190,6 +190,40 @@ export async function registerRoutes(
       return res.status(500).json({ message: err.message });
     }
   });
+    app.put("/api/receipts/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+
+      const {
+        merchant,
+        purchaseDate,
+        total,
+        category,
+        gallons,
+        jobId,
+        notes,
+      } = req.body;
+
+      const updated = await storage.updateReceipt(id, {
+        merchant,
+        purchaseDate,
+        total,
+        category,
+        gallons,
+        jobId,
+        notes,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating receipt:", error);
+      res.status(500).json({ message: "Failed to update receipt" });
+    }
+  });
   app.delete("/api/receipts/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
