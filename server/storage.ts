@@ -8,6 +8,7 @@ export interface IStorage {
   getReceipts(filters?: any): Promise<any[]>;
   getReceipt(id: number): Promise<any>;
   createReceipt(receipt: any): Promise<any>;
+  deleteReceipt(id: number): Promise<boolean>;
 }
 
 class InMemoryStorage implements IStorage {
@@ -56,6 +57,12 @@ class InMemoryStorage implements IStorage {
     this.receipts.push(newReceipt);
     return newReceipt;
   }
+  async deleteReceipt(id: number) {
+  const index = this.receipts.findIndex(r => r.id === id);
+  if (index === -1) return false;
+
+  this.receipts.splice(index, 1);
+  return true;
 }
 
 export const storage = new InMemoryStorage();
