@@ -78,6 +78,13 @@ export default function ReceiptsPage() {
     setJobFilter("all");
     setCategoryFilter("all");
   };
+  
+    const truncateText = (text?: string | null, maxLength = 32) => {
+    if (!text) return "—";
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength)}...`;
+  };
+  
   const handleDelete = async (id: number) => {
   const confirmed = window.confirm("Delete this receipt?");
   if (!confirmed) return;
@@ -207,7 +214,8 @@ export default function ReceiptsPage() {
                     <TableHead>Job</TableHead>
                     <TableHead className="w-[90px]">Category</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Total</TableHead>
-                    <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
+                   <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
+                    <TableHead className="min-w-[220px]">Notes</TableHead>
                     <TableHead>Actions</TableHead>
                     </TableRow> 
                   </TableHeader>                
@@ -242,9 +250,16 @@ export default function ReceiptsPage() {
 <TableCell className="text-right text-sm font-mono">
   {r.gallons != null ? r.gallons.toFixed(3) : "—"}
 </TableCell>
+
+<TableCell className="text-sm text-muted-foreground max-w-[260px]">
+  <span title={r.notes || ""}>
+    {truncateText(r.notes)}
+  </span>
+</TableCell>
+
 <TableCell>
   <button onClick={() => handleDelete(r.id)}>Delete</button>
-                    </TableCell>
+</TableCell>
                     </TableRow>
                     ))}
                     </TableBody>              
