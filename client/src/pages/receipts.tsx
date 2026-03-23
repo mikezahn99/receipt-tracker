@@ -78,7 +78,22 @@ export default function ReceiptsPage() {
     setJobFilter("all");
     setCategoryFilter("all");
   };
+  const handleDelete = async (id: number) => {
+  const confirmed = window.confirm("Delete this receipt?");
+  if (!confirmed) return;
 
+  const response = await fetch(`/api/receipts/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    alert("Failed to delete receipt");
+    return;
+  }
+
+  window.location.reload();
+};
+  
   const hasFilters = startDate || endDate || jobFilter !== "all" || categoryFilter !== "all";
 
   return (
@@ -193,7 +208,7 @@ export default function ReceiptsPage() {
                     <TableHead className="w-[90px]">Category</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Total</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
-                  </TableRow>
+                    <TableHead>Actions</TableHead>
                 </TableHeader>
                 <TableBody>
                   {receipts.map((r) => (
@@ -221,14 +236,15 @@ export default function ReceiptsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm font-mono">
-                        {r.total != null ? `$${r.total.toFixed(2)}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-mono">
-                        {r.gallons != null ? r.gallons.toFixed(3) : "—"}
-                      </TableCell>
+  {r.total != null ? `$${r.total.toFixed(2)}` : "—"}
+</TableCell>
+<TableCell className="text-right text-sm font-mono">
+  {r.gallons != null ? r.gallons.toFixed(3) : "—"}
+</TableCell>
+<TableCell>
+  <button onClick={() => handleDelete(r.id)}>Delete</button>
+                    </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
               </Table>
             </div>
           ) : (
