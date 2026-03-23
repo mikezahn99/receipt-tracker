@@ -246,7 +246,9 @@ export default function ReceiptsPage() {
   <button onClick={() => handleDelete(r.id)}>Delete</button>
                     </TableCell>
                     </TableRow>
-              </Table>
+                    ))}
+                    </TableBody>              
+                  </Table>
             </div>
           ) : (
             <div className="p-12 text-center text-muted-foreground">
