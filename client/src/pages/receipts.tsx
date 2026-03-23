@@ -135,6 +135,34 @@ export default function ReceiptsPage() {
     }));
   };
   
+    const handleSaveEdit = async () => {
+    if (!editingReceiptId) return;
+
+    const response = await fetch(`/api/receipts/${editingReceiptId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        merchant: editForm.merchant,
+        purchaseDate: editForm.purchaseDate || null,
+        total: editForm.total ? Number(editForm.total) : null,
+        category: editForm.category,
+        gallons: editForm.gallons ? Number(editForm.gallons) : null,
+        jobId: Number(editForm.jobId),
+        notes: editForm.notes,
+      }),
+    });
+
+    if (!response.ok) {
+      alert("Failed to update receipt");
+      return;
+    }
+
+    handleCloseEdit();
+    window.location.reload();
+  };
+  
   const handleDelete = async (id: number) => {
   const confirmed = window.confirm("Delete this receipt?");
   if (!confirmed) return;
@@ -435,8 +463,8 @@ export default function ReceiptsPage() {
               <Button variant="outline" onClick={handleCloseEdit}>
                 Cancel
               </Button>
-              <Button disabled>
-                Save Changes
+              <Button onClick={handleSaveEdit}>
+              Save Changes
               </Button>
             </div>
           </div>
