@@ -1,15 +1,19 @@
 import fs from "fs";
 import path from "path";
 import Database from "better-sqlite3";
-import type { InsertJob, InsertReceipt, Job, Receipt } from "@shared/schema";
-
+import bcrypt from "bcryptjs";
+import type { InsertJob, InsertReceipt, InsertUser, Job, Receipt, User } from "@shared/schema";
 export interface IStorage {
   getJobs(): Promise<Job[]>;
   getActiveJobs(): Promise<Job[]>;
   getJob(id: number): Promise<Job | undefined>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: number, job: Partial<InsertJob>): Promise<Job | undefined>;
-
+  
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;  
+  
   getReceipts(filters?: {
     startDate?: string;
     endDate?: string;
@@ -37,6 +41,14 @@ sqlite.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Active'
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS receipts (
@@ -148,7 +160,66 @@ class SQLiteStorage implements IStorage {
       status: nextStatus,
     };
   }
+  async getUser(id: number): Promise<User | undefined> {
+    const row = sqlite
+      .prepare(
+        `
+        SELECT
+          id,
+          username,
+          password_hash as passwordHash,
+          role,
+          created_at as createdAt
+        FROM users
+        WHERE id = ?
+        `
+      )
+      .get(id);
 
+    return row as User | undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const row = sqlite
+      .prepare(
+        `
+        SELECT
+          id,
+          username,
+          password_hash as passwordHash,
+          role,
+          created_at as createdAt
+        FROM users
+        WHERE username = ?
+        `
+      )
+      .get(username);
+
+    return row as User | undefined;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = sqlite
+      .prepare(
+        `
+        INSERT INTO users (username, password_hash, role)
+        VALUES (?, ?, ?)
+        `
+      )
+      .run(
+        user.username,
+        user.passwordHash,
+        user.role ?? "user"
+      );
+
+    const created = await this.getUser(Number(result.lastInsertRowid));
+    if (!created) {
+      throw new Error("Failed to create user");
+    }
+
+    return created;
+  }
+  
   async getReceipts(filters?: {
     startDate?: string;
     endDate?: string;
@@ -323,6 +394,27 @@ class SQLiteStorage implements IStorage {
 
 export const storage = new SQLiteStorage();
 
+function seedDefaultAdmin() {
+  const existing = sqlite
+    .prepare(`SELECT id FROM users WHERE username = ?`)
+    .get("admin");
+
+  if (!existing) {
+    const passwordHash = bcrypt.hashSync("changeme123", 10);
+
+    sqlite
+      .prepare(
+        `
+        INSERT INTO users (username, password_hash, role)
+        VALUES (?, ?, ?)
+        `
+      )
+      .run("admin", passwordHash, "admin");
+
+    console.log("Seeded default admin user: admin / changeme123");
+  }
+  }
+
 export function seedDatabase() {
   const countRow = sqlite
     .prepare(`SELECT COUNT(*) as count FROM jobs`)
@@ -340,6 +432,8 @@ export function seedDatabase() {
       )
       .run();
   }
+
+  seedDefaultAdmin();
 
   console.log(`Using SQLite database at ${dbPath}`);
 }
