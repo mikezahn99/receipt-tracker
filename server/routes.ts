@@ -19,6 +19,7 @@ import { extractTextFromImage, parseReceiptText } from "./ocr";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcryptjs";
 
 // ── File upload configuration ───────────────
 // Uploaded receipt images are saved to ./uploads/
@@ -99,7 +100,79 @@ export async function registerRoutes(
       return res.status(500).json({ message: err.message || "OCR processing failed" });
     }
   });
+  
+  // ════════════════════════════════════════════
+  // AUTH ENDPOINTS
+  // ════════════════════════════════════════════
 
+  /** POST /api/auth/register – create a new user */
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const passwordHash = bcrypt.hashSync(password, 10);
+
+      const user = await storage.createUser({
+        username,
+        passwordHash,
+        role: "user",
+      });
+
+      return res.status(201).json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      });
+    } catch (err: any) {
+      console.error("Register error:", err);
+      return res.status(500).json({ message: "Failed to register user" });
+    }
+  });
+
+  /** POST /api/auth/login – verify username/password */
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid username or password" });
+      }
+
+      const valid = bcrypt.compareSync(password, user.passwordHash);
+      if (!valid) {
+        return res.status(400).json({ message: "Invalid username or password" });
+      }
+
+      return res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      return res.status(500).json({ message: "Failed to login" });
+    }
+  });
+
+  /** POST /api/auth/logout – placeholder until session middleware is added */
+  app.post("/api/auth/logout", async (_req, res) => {
+    return res.json({ success: true });
+  });
+  
   // ════════════════════════════════════════════
   // RECEIPTS ENDPOINTS
   // ════════════════════════════════════════════
