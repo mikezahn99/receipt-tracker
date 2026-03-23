@@ -64,6 +64,7 @@ class InMemoryStorage implements IStorage {
   this.receipts.splice(index, 1);
   return true;
 }
+}
 
 export const storage = new InMemoryStorage();
 
