@@ -222,14 +222,22 @@ return res.json({
    *   ?jobId=123
    *   ?category=Fuel  (or "Other")
    */
-  app.get("/api/receipts", async (req, res) => {
+    app.get("/api/receipts", async (req, res) => {
     try {
+      const user = req.session.user;
+
+      if (!user) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+
       const filters = {
         startDate: req.query.startDate as string | undefined,
         endDate: req.query.endDate as string | undefined,
         jobId: req.query.jobId ? parseInt(req.query.jobId as string) : undefined,
         category: req.query.category as string | undefined,
+        userId: user.id,
       };
+
       const receipts = await storage.getReceipts(filters);
       return res.json(receipts);
     } catch (err: any) {
@@ -245,6 +253,12 @@ return res.json({
    */
   app.post("/api/receipts", async (req, res) => {
     try {
+      const user = req.session.user;
+
+      if (!user) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+
       const parsed = insertReceiptSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({
@@ -252,7 +266,12 @@ return res.json({
           errors: parsed.error.flatten().fieldErrors,
         });
       }
-      const receipt = await storage.createReceipt(parsed.data);
+
+      const receipt = await storage.createReceipt({
+        ...parsed.data,
+        userId: user.id,
+      });
+
       return res.status(201).json(receipt);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
