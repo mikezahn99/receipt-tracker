@@ -70,6 +70,8 @@ export const receipts = sqliteTable("receipts", {
   /** Total gallons (only relevant when category is "Fuel") */
   gallons: real("gallons"),
   /** Foreign key to the jobs table — every receipt must be assigned to a job */
+    userId: integer("user_id").notNull(),
+    /** Foreign key to the jobs table — every receipt must be assigned to a job */
   jobId: integer("job_id").notNull(),
   /** Full raw OCR text stored for debugging / reference */
   rawOcrText: text("raw_ocr_text"),
@@ -78,7 +80,7 @@ export const receipts = sqliteTable("receipts", {
 });
 
 export const insertReceiptSchema = createInsertSchema(receipts)
-  .omit({ id: true, createdAt: true })
+  .omit({ id: true, createdAt: true, userId: true })
   .extend({
     /** Total cost must be a positive number */
     total: z.number().positive("Total must be a positive number").nullable().optional(),
