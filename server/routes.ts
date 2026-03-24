@@ -20,6 +20,15 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+declare module "express-session" {
+  interface SessionData {
+    user?: {
+      id: number;
+      username: string;
+      role: string;
+    };
+  }
+}
 
 // ── File upload configuration ───────────────
 // Uploaded receipt images are saved to ./uploads/
@@ -157,11 +166,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid username or password" });
       }
 
-      return res.json({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-      });
+    req.session.user = {
+  id: user.id,
+  username: user.username,
+  role: user.role,
+};
+
+return res.json({
+  id: user.id,
+  username: user.username,
+  role: user.role,
+});
     } catch (err: any) {
       console.error("Login error:", err);
       return res.status(500).json({ message: "Failed to login" });
@@ -169,8 +184,29 @@ export async function registerRoutes(
   });
 
   /** POST /api/auth/logout – placeholder until session middleware is added */
-  app.post("/api/auth/logout", async (_req, res) => {
+ app.post("/api/auth/logout", (req, res) => {
+  if (!req.session) {
     return res.json({ success: true });
+  }
+
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ message: "Failed to logout" });
+    }
+
+    res.clearCookie("connect.sid");
+    return res.json({ success: true });
+  });
+});
+    app.get("/api/auth/me", (req, res) => {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({ message: "Not logged in" });
+    }
+
+    return res.json(user);
   });
   
   // ════════════════════════════════════════════
