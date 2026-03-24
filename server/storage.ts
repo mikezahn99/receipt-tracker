@@ -14,14 +14,15 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;  
   
-  getReceipts(filters?: {
+    getReceipts(filters?: {
     startDate?: string;
     endDate?: string;
     jobId?: number;
     category?: string;
+    userId?: number;
   }): Promise<Receipt[]>;
   getReceipt(id: number): Promise<Receipt | undefined>;
-  createReceipt(receipt: InsertReceipt): Promise<Receipt>;
+  createReceipt(receipt: InsertReceipt & { userId: number }): Promise<Receipt>;
   updateReceipt(id: number, receipt: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: number): Promise<boolean>;
 }
@@ -60,12 +61,22 @@ sqlite.exec(`
     total REAL,
     category TEXT NOT NULL DEFAULT 'Other',
     gallons REAL,
+    user_id INTEGER,
     job_id INTEGER NOT NULL,
     raw_ocr_text TEXT,
     notes TEXT,
     FOREIGN KEY (job_id) REFERENCES jobs(id)
   );
 `);
+const receiptColumns = sqlite
+  .prepare(`PRAGMA table_info(receipts)`)
+  .all() as Array<{ name: string }>;
+
+const hasUserIdColumn = receiptColumns.some((col) => col.name === "user_id");
+
+if (!hasUserIdColumn) {
+  sqlite.exec(`ALTER TABLE receipts ADD COLUMN user_id INTEGER;`);
+}
 
 class SQLiteStorage implements IStorage {
   async getJobs(): Promise<Job[]> {
@@ -220,11 +231,12 @@ class SQLiteStorage implements IStorage {
     return created;
   }
   
-  async getReceipts(filters?: {
+    async getReceipts(filters?: {
     startDate?: string;
     endDate?: string;
     jobId?: number;
     category?: string;
+    userId?: number;
   }): Promise<Receipt[]> {
     let sql = `
       SELECT
@@ -236,6 +248,7 @@ class SQLiteStorage implements IStorage {
         total,
         category,
         gallons,
+        user_id as userId,
         job_id as jobId,
         raw_ocr_text as rawOcrText,
         notes
@@ -244,7 +257,11 @@ class SQLiteStorage implements IStorage {
     `;
 
     const params: any[] = [];
-
+      if (filters?.userId) {
+      sql += ` AND user_id = ?`;
+      params.push(filters.userId);
+    }
+      
     if (filters?.startDate) {
       sql += ` AND purchase_date >= ?`;
       params.push(filters.startDate);
@@ -284,6 +301,7 @@ class SQLiteStorage implements IStorage {
           total,
           category,
           gallons,
+          user_id as userId,
           job_id as jobId,
           raw_ocr_text as rawOcrText,
           notes
@@ -296,31 +314,33 @@ class SQLiteStorage implements IStorage {
     return row as Receipt | undefined;
   }
 
-  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    async createReceipt(receipt: InsertReceipt & { userId: number }): Promise<Receipt> {
     const result = sqlite
       .prepare(
         `
-        INSERT INTO receipts (
+          INSERT INTO receipts (
           image_path,
           merchant,
           purchase_date,
           total,
           category,
           gallons,
+          user_id,
           job_id,
           raw_ocr_text,
           notes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
-      .run(
+        .run(
         receipt.imagePath ?? null,
         receipt.merchant ?? null,
         receipt.purchaseDate ?? null,
         receipt.total ?? null,
         receipt.category ?? "Other",
         receipt.gallons ?? null,
+        receipt.userId,
         receipt.jobId,
         receipt.rawOcrText ?? null,
         receipt.notes ?? null
