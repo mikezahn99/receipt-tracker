@@ -3,7 +3,9 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
+import { seedDatabase } from "./storage";
 
+seedDatabase();
 
 const app = express();
 app.set("trust proxy", 1);
