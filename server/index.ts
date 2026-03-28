@@ -105,8 +105,26 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
  const port = parseInt(process.env.PORT || "5000", 10);
+  
+import { db } from "./db"; // adjust if path differs
+import { users } from "../shared/schema";
 
-httpServer.listen(port, "0.0.0.0", () => {
+async function seedUser() {
+  const existing = await db.select().from(users);
+
+  if (existing.length === 0) {
+    await db.insert(users).values({
+      username: "mike",
+      password: "1234",
+    });
+
+    console.log("Seeded test user: mike / 1234");
+  }
+}
+
+seedUser();
+  
+  httpServer.listen(port, "0.0.0.0", () => {
   console.log(`Server running on port ${port}`);
 });
 })();
