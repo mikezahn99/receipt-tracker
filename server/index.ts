@@ -3,6 +3,9 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
+import { db } from "./db"; // adjust if path differs
+import { users } from "../shared/schema";
+
 
 const app = express();
 app.set("trust proxy", 1);
@@ -106,9 +109,6 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
  const port = parseInt(process.env.PORT || "5000", 10);
   
-import { db } from "./db"; // adjust if path differs
-import { users } from "../shared/schema";
-
 async function seedUser() {
   const existing = await db.select().from(users);
 
@@ -124,7 +124,7 @@ async function seedUser() {
 
 seedUser();
   
-  httpServer.listen(port, "0.0.0.0", () => {
+  http.listen(port, "0.0.0.0", () => {
   console.log(`Server running on port ${port}`);
 });
 })();
