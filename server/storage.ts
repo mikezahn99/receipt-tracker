@@ -78,6 +78,20 @@ if (!hasUserIdColumn) {
   sqlite.exec(`ALTER TABLE receipts ADD COLUMN user_id INTEGER;`);
 }
 
+const adminUserRow = sqlite
+  .prepare(`SELECT id FROM users WHERE username = ?`)
+  .get("admin") as { id: number } | undefined;
+
+if (adminUserRow) {
+  sqlite
+    .prepare(`
+      UPDATE receipts
+      SET user_id = ?
+      WHERE user_id IS NULL
+    `)
+    .run(adminUserRow.id);
+}
+
 class SQLiteStorage implements IStorage {
   async getJobs(): Promise<Job[]> {
     const rows = sqlite
