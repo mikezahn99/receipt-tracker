@@ -2,9 +2,9 @@ import { users, receipts, jobs, type User, type InsertUser, type Receipt, type I
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
-import connectSdks from "connect-sqlite3";
+import createSQLiteStore from "connect-sqlite3";
 
-const SQLiteStore = connectSdks(session);
+const SQLiteStore = createSQLiteStore(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -24,8 +24,9 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
+    // We changed the "dir" to "./" so it stays on the main job site
     this.sessionStore = new SQLiteStore({ 
-      dir: "./var/data",
+      dir: "./",
       db: "sessions.db" 
     });
     
@@ -87,8 +88,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteReceipt(id: number): Promise<boolean> {
-    const result = await db.delete(receipts).where(eq(receipts.id, id));
-    return true; // Drizzle returns result, but we just need to confirm completion
+    await db.delete(receipts).where(eq(receipts.id, id));
+    return true; 
   }
 }
 
