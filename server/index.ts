@@ -3,9 +3,6 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
-import { seedDatabase } from "./storage";
-
-seedDatabase();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -107,9 +104,9 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
- const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   
-httpServer.listen(port, "0.0.0.0", () => {
-  console.log(`Server running on port ${port}`);
-});
+  httpServer.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on port ${port}`);
+  });
 })();
