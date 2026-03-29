@@ -218,11 +218,25 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         purchaseDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
 
-      // -- Find Total (Looking for "Total" followed by a number) --
-      // This regex looks for "Total" and captures the biggest currency number near it
-      const totalMatch = rawText.match(/(?:total|amount due|sale|debit|credit)[\s$:=]*(\d+\.\d{2})/i);
-      if (totalMatch) {
-        total = parseFloat(totalMatch[1]);
+      // -- Find Total (Smart Parsing) --
+      // 1. Look for exact keywords like "Total", "Visa", "Amount Due" (ignoring Subtotal)
+      const totalRegex = /\b(?:total|amount due|sale|debit|credit|visa|mastercard|mc|amex|cash)\b[\s$:=]*(\d+\.\d{2})/gi;
+      let match;
+      let possibleTotals: number[] = [];
+      
+      while ((match = totalRegex.exec(rawText)) !== null) {
+        possibleTotals.push(parseFloat(match[1]));
+      }
+      
+      if (possibleTotals.length > 0) {
+        // The final total is almost always the largest number attached to these keywords
+        total = Math.max(...possibleTotals);
+      } else {
+        // 2. FALLBACK: If it can't find the word "Total", just grab the absolute largest price on the receipt
+        const allPrices = rawText.match(/\b\d+\.\d{2}\b/g);
+        if (allPrices) {
+          total = Math.max(...allPrices.map(n => parseFloat(n)));
+        }
       }
 
       // -- Find Gallons & Fuel Category --
