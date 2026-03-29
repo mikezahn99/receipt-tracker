@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import vision from '@google-cloud/vision';
 
 export async function registerRoutes(server: Server, app: Express): Promise<Server> {
   
