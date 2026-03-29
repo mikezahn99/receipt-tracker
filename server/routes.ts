@@ -160,24 +160,99 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
 
   // ─── RECEIPT ROUTES ───
 
-  // THE FIX: The OCR Upload Window
+ // ─── THE OCR SCANNER (GOOGLE VISION) ───
+  
+  // Initialize the Google Vision Client securely
+  let visionClient: vision.ImageAnnotatorClient | null = null;
+  try {
+    if (process.env.GOOGLE_CREDENTIALS) {
+      // If the keys are in the Render vault, use them
+      const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+      visionClient = new vision.ImageAnnotatorClient({ credentials });
+    } else {
+      // Fallback (will only work if keys are set up locally)
+      visionClient = new vision.ImageAnnotatorClient(); 
+    }
+  } catch (e) {
+    console.warn("Vision API client init failed. Missing or invalid keys.");
+  }
+
   app.post("/api/receipts/ocr", upload.single("image"), async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
 
-    console.log(`[STORAGE] Receipt photo safely stored at: ${req.file.path}`);
+    try {
+      if (!visionClient) {
+        return res.json({ 
+          imagePath: `/uploads/${req.file.filename}`, 
+          rawOcrText: "Google Vision API keys are not configured in the Render Vault yet." 
+        });
+      }
 
-    // DUMMY RESPONSE: We return fake data just to prove the upload gate works 
-    // before we start messing with complex Google Vision APIs.
-    return res.json({
-      imagePath: `/uploads/${req.file.filename}`,
-      merchant: "Upload Successful!",
-      purchaseDate: new Date().toISOString().split('T')[0],
-      total: 0.00,
-      category: "Other",
-      gallons: null,
-      rawOcrText: "The filing cabinet is working perfectly! Your photo was saved. We will wire up the actual Google OCR scanner next.",
-    });
+      console.log(`[OCR] Scanning receipt: ${req.file.path}`);
+      
+      // 1. Send the photo to Google
+      const [result] = await visionClient.textDetection(req.file.path);
+      const detections = result.textAnnotations;
+      const rawText = detections && detections.length > 0 ? detections[0].description : "";
+
+      if (!rawText) {
+        return res.json({ imagePath: `/uploads/${req.file.filename}`, rawOcrText: "" });
+      }
+
+      // 2. The Brain: Parse the raw text to find our fields
+      const lines = rawText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      let merchant = lines[0] || ""; // Usually the very first line is the store name
+      let purchaseDate = "";
+      let total: number | null = null;
+      let category = "Other";
+      let gallons: number | null = null;
+
+      // -- Find Date (Looking for MM/DD/YY or MM/DD/YYYY) --
+      const dateMatch = rawText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (dateMatch) {
+        let [_, month, day, year] = dateMatch;
+        if (year.length === 2) year = "20" + year; // Convert 26 to 2026
+        // Format for the HTML date input (YYYY-MM-DD)
+        purchaseDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+
+      // -- Find Total (Looking for "Total" followed by a number) --
+      // This regex looks for "Total" and captures the biggest currency number near it
+      const totalMatch = rawText.match(/(?:total|amount due|sale|debit|credit)[\s$:=]*(\d+\.\d{2})/i);
+      if (totalMatch) {
+        total = parseFloat(totalMatch[1]);
+      }
+
+      // -- Find Gallons & Fuel Category --
+      const gallonMatch = rawText.match(/(\d+\.\d{3})\s*(gal|g|gallons)/i);
+      if (gallonMatch) {
+        gallons = parseFloat(gallonMatch[1]);
+        category = "Fuel";
+      } else if (rawText.toLowerCase().includes("pump") || rawText.toLowerCase().includes("unleaded") || rawText.toLowerCase().includes("diesel")) {
+        category = "Fuel";
+      }
+
+      // 3. Send the parsed data back to the frontend form
+      return res.json({
+        imagePath: `/uploads/${req.file.filename}`,
+        merchant: merchant.substring(0, 50),
+        purchaseDate: purchaseDate,
+        total: total,
+        category: category,
+        gallons: gallons,
+        rawOcrText: rawText, // Keep the raw text so you can debug what it missed
+      });
+
+    } catch (error) {
+      console.error("OCR API Error:", error);
+      // If OCR fails, still return the image path so they can enter data manually
+      return res.json({
+        imagePath: `/uploads/${req.file.filename}`,
+        rawOcrText: "Error communicating with Google Vision API. Please enter details manually.",
+      });
+    }
   });
 
   app.get("/api/receipts", async (req, res) => {
