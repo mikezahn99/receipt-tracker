@@ -4,6 +4,7 @@
  * Displays all jobs and allows:
  * - Creating new jobs
  * - Toggling job status (Active / Inactive)
+ * - Deleting jobs permanently
  */
 
 import { useState } from "react";
@@ -24,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Briefcase, ToggleLeft, ToggleRight } from "lucide-react";
+import { PlusCircle, Briefcase, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 
 export default function JobsPage() {
   const { toast } = useToast();
@@ -68,6 +69,22 @@ export default function JobsPage() {
     },
   });
 
+  // THE FIX 1: Add the Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      // apiRequest handles throwing an error if the response is not OK
+      await apiRequest("DELETE", `/api/jobs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/active"] });
+      toast({ title: "Job deleted", description: "The job has been permanently removed." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleCreate = () => {
     const trimmed = newJobName.trim();
     if (!trimmed) {
@@ -75,6 +92,16 @@ export default function JobsPage() {
       return;
     }
     createMutation.mutate(trimmed);
+  };
+
+  // THE FIX 2: Add the Safety check before deleting
+  const handleDelete = (id: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this job? Any receipts assigned to it will lose their job name reference."
+    );
+    if (confirmed) {
+      deleteMutation.mutate(id);
+    }
   };
 
   return (
@@ -131,7 +158,7 @@ export default function JobsPage() {
                 <TableRow>
                   <TableHead>Job Name</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[100px] text-right">Action</TableHead>
+                  <TableHead className="w-[180px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,32 +172,46 @@ export default function JobsPage() {
                         <Badge variant="secondary" className="text-xs">Inactive</Badge>
                       )}
                     </TableCell>
+                    
+                    {/* THE FIX 3: Added the delete button to the actions column */}
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-7"
-                        onClick={() =>
-                          toggleMutation.mutate({
-                            id: job.id,
-                            currentStatus: job.status,
-                          })
-                        }
-                        disabled={toggleMutation.isPending}
-                        data-testid={`button-toggle-${job.id}`}
-                      >
-                        {job.status === "Active" ? (
-                          <>
-                            <ToggleRight className="h-3.5 w-3.5 mr-1" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <ToggleLeft className="h-3.5 w-3.5 mr-1" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() =>
+                            toggleMutation.mutate({
+                              id: job.id,
+                              currentStatus: job.status,
+                            })
+                          }
+                          disabled={toggleMutation.isPending}
+                        >
+                          {job.status === "Active" ? (
+                            <>
+                              <ToggleRight className="h-3.5 w-3.5 mr-1" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="h-3.5 w-3.5 mr-1" />
+                              Activate
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDelete(job.id)}
+                          disabled={deleteMutation.isPending}
+                          title="Delete Job permanently"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
