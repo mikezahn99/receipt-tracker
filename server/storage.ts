@@ -48,12 +48,17 @@ export class DatabaseStorage implements IStorage {
           password: hashedPassword
         });
       } else {
-        // 3. THE FIX: If the admin exists, forcibly upgrade their lock
-        console.log("Admin found. Upgrading old padlock to new scrambled lock...");
-        await db.update(users)
-          .set({ password: hashedPassword })
-          .where(eq(users.username, "admin"))
-          .returning(); // <-- The crucial execution stamp!
+        // 3. THE BOLT CUTTER FIX: Delete the old account and rebuild it instantly
+        console.log("Admin found but lock is old. Cutting it off and replacing...");
+        
+        // Scrap the old account
+        await db.delete(users).where(eq(users.username, "admin"));
+        
+        // Build the new one with the secure lock
+        await this.createUser({
+          username: "admin",
+          password: hashedPassword
+        });
       }
     } catch (error) {
       console.error("Error seeding admin:", error);
