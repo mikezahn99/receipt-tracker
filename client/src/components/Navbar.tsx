@@ -7,24 +7,24 @@ import { LogOut, HardHat } from "lucide-react";
 export default function Navbar() {
   const [, setLocation] = useLocation();
 
-  // 1. Check who is currently on the clock
+  // THE FIX 1: Tune to the exact same channel that App.tsx is listening to
   const { data: user } = useQuery<{ id: number; username: string }>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/auth/me"],
   });
 
-  // 2. The action to clock out
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      // Clear the local cache and send them back to the login gate
-      queryClient.setQueryData(["/api/user"], null);
-      setLocation("/auth"); 
+      // THE FIX 2: Clear the correct clipboard so the main App knows you left
+      queryClient.setQueryData(["/api/auth/me"], null);
+      
+      // THE FIX 3: Send the truck back to the main gate, not a missing page
+      setLocation("/"); 
     },
   });
 
-  // If nobody is logged in, don't show the bar at all
   if (!user) return null;
 
   return (
@@ -32,7 +32,6 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between items-center">
           
-          {/* Left Side: Logo */}
           <div className="flex items-center gap-2">
             <div className="bg-primary p-1.5 rounded-lg">
               <HardHat className="h-6 w-6 text-white" />
@@ -42,7 +41,6 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Right Side: User & Logout */}
           <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col items-end mr-2">
               <span className="text-sm font-semibold text-gray-700">
