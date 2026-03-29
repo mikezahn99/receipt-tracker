@@ -72,7 +72,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     return res.json(allJobs);
   });
 
-  // THE FIX 4: Open the gate specifically for active jobs (used by the Receipt Form)
   app.get("/api/jobs/active", async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
     const activeJobs = await storage.getActiveJobs();
@@ -90,8 +89,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     }
   });
 
-  // THE FIX 5: Open the gate to update/deactivate existing jobs
-  // (We add both PATCH and PUT just to cover whatever the frontend uses)
   app.patch("/api/jobs/:id", async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
     try {
@@ -111,6 +108,22 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
       return res.json(updated);
     } catch (error) {
       return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  // THE FIX: The Delete Route
+  app.delete("/api/jobs/:id", async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getJob(id);
+      if (!existing) return res.status(404).json({ message: "Job not found" });
+      
+      await storage.deleteJob(id);
+      return res.status(204).send();
+    } catch (error) {
+      console.error("Delete job error:", error);
+      return res.status(500).json({ message: "Failed to delete job" });
     }
   });
 
