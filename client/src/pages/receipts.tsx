@@ -5,6 +5,7 @@
  * date, merchant, job, category, total, gallons.
  *
  * Filters: date range, job, category (Fuel / Other).
+ * Sorting: Newest First, Oldest First.
  */
 
 import { useState, type ChangeEvent } from "react";
@@ -34,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Filter, Fuel, ShoppingBag } from "lucide-react";
+import { PlusCircle, Filter, Fuel, ShoppingBag, ArrowUpDown } from "lucide-react";
 
 export default function ReceiptsPage() {
   // ── Filter state ──
@@ -42,8 +43,11 @@ export default function ReceiptsPage() {
   const [endDate, setEndDate] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  
+  // THE FIX 1: Add a Sort State (Default to newest first)
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
 
-    const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
     merchant: "",
@@ -90,14 +94,16 @@ export default function ReceiptsPage() {
     setEndDate("");
     setJobFilter("all");
     setCategoryFilter("all");
+    setSortOrder("desc"); // Reset sort order too
   };
   
-    const truncateText = (text?: string | null, maxLength = 32) => {
+  const truncateText = (text?: string | null, maxLength = 32) => {
     if (!text) return "—";
     if (text.length <= maxLength) return text;
     return `${text.slice(0, maxLength)}...`;
   };
-    const handleEditClick = (receipt: Receipt) => {
+
+  const handleEditClick = (receipt: Receipt) => {
     setEditingReceiptId(receipt.id);
     setEditForm({
       merchant: receipt.merchant || "",
@@ -135,7 +141,7 @@ export default function ReceiptsPage() {
     }));
   };
   
-    const handleSaveEdit = async () => {
+  const handleSaveEdit = async () => {
     if (!editingReceiptId) return;
 
     const response = await fetch(`/api/receipts/${editingReceiptId}`, {
@@ -164,21 +170,29 @@ export default function ReceiptsPage() {
   };
   
   const handleDelete = async (id: number) => {
-  const confirmed = window.confirm("Delete this receipt?");
-  if (!confirmed) return;
+    const confirmed = window.confirm("Delete this receipt?");
+    if (!confirmed) return;
 
-  const response = await fetch(`/api/receipts/${id}`, {
-    method: "DELETE",
-  });
+    const response = await fetch(`/api/receipts/${id}`, {
+      method: "DELETE",
+    });
 
-  if (!response.ok) {
-    alert("Failed to delete receipt");
-    return;
-  }
+    if (!response.ok) {
+      alert("Failed to delete receipt");
+      return;
+    }
 
-  window.location.reload();
-};
+    window.location.reload();
+  };
   
+  // THE FIX 2: Sort the receipts array dynamically before rendering
+  const sortedReceipts = receipts ? [...receipts].sort((a, b) => {
+    // If there's no purchase date, fall back to when the receipt was created in the app
+    const dateA = new Date(a.purchaseDate || a.createdAt).getTime();
+    const dateB = new Date(b.purchaseDate || b.createdAt).getTime();
+    return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+  }) : [];
+
   const hasFilters = startDate || endDate || jobFilter !== "all" || categoryFilter !== "all";
 
   return (
@@ -206,18 +220,17 @@ export default function ReceiptsPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Filter className="h-4 w-4" />
-            Filters
+            Filters & Sorting
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Start Date</label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                data-testid="input-start-date"
               />
             </div>
             <div>
@@ -226,13 +239,12 @@ export default function ReceiptsPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                data-testid="input-end-date"
               />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Job</label>
               <Select value={jobFilter} onValueChange={setJobFilter}>
-                <SelectTrigger data-testid="select-job-filter">
+                <SelectTrigger>
                   <SelectValue placeholder="All Jobs" />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,7 +260,7 @@ export default function ReceiptsPage() {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Category</label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger data-testid="select-category-filter">
+                <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,14 +270,30 @@ export default function ReceiptsPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* THE FIX 3: The Sort Dropdown */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1">
+                <ArrowUpDown className="h-3 w-3" /> Sort Date
+              </label>
+              <Select value={sortOrder} onValueChange={(v: "desc" | "asc") => setSortOrder(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Newest first" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Newest First</SelectItem>
+                  <SelectItem value="asc">Oldest First</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          
           {hasFilters && (
             <Button
               variant="ghost"
               size="sm"
               className="mt-2 text-xs"
               onClick={clearFilters}
-              data-testid="button-clear-filters"
             >
               Clear all filters
             </Button>
@@ -282,7 +310,7 @@ export default function ReceiptsPage() {
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
-          ) : receipts && receipts.length > 0 ? (
+          ) : sortedReceipts && sortedReceipts.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -292,14 +320,15 @@ export default function ReceiptsPage() {
                     <TableHead>Job</TableHead>
                     <TableHead className="w-[90px]">Category</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Total</TableHead>
-                   <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
+                    <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
                     <TableHead className="min-w-[220px]">Notes</TableHead>
                     <TableHead>Actions</TableHead>
-                    </TableRow> 
-                  </TableHeader>                
+                  </TableRow> 
+                </TableHeader>                
                 <TableBody>
-                  {receipts.map((r) => (
-                    <TableRow key={r.id} data-testid={`receipt-row-${r.id}`}>
+                  {/* THE FIX 4: Map over the new sortedReceipts array instead of the raw data */}
+                  {sortedReceipts.map((r) => (
+                    <TableRow key={r.id}>
                       <TableCell className="text-sm whitespace-nowrap">
                         {r.purchaseDate
                           ? format(parseISO(r.purchaseDate), "MM/dd/yyyy")
@@ -323,28 +352,26 @@ export default function ReceiptsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm font-mono">
-  {r.total != null ? `$${r.total.toFixed(2)}` : "—"}
-</TableCell>
-<TableCell className="text-right text-sm font-mono">
-  {r.gallons != null ? r.gallons.toFixed(3) : "—"}
-</TableCell>
-
-<TableCell className="text-sm text-muted-foreground max-w-[260px]">
-  <span title={r.notes || ""}>
-    {truncateText(r.notes)}
-  </span>
-</TableCell>
-
+                        {r.total != null ? `$${r.total.toFixed(2)}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-mono">
+                        {r.gallons != null ? r.gallons.toFixed(3) : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[260px]">
+                        <span title={r.notes || ""}>
+                          {truncateText(r.notes)}
+                        </span>
+                      </TableCell>
                       <TableCell>
-  <div className="flex items-center gap-3">
-    <button onClick={() => handleEditClick(r)}>Edit</button>
-    <button onClick={() => handleDelete(r.id)}>Delete</button>
-  </div>
-</TableCell>
+                        <div className="flex items-center gap-3">
+                          <button className="text-primary hover:underline" onClick={() => handleEditClick(r)}>Edit</button>
+                          <button className="text-red-600 hover:underline" onClick={() => handleDelete(r.id)}>Delete</button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                    ))}
-                    </TableBody>              
-                  </Table>
+                  ))}
+                </TableBody>              
+              </Table>
             </div>
           ) : (
             <div className="p-12 text-center text-muted-foreground">
@@ -357,12 +384,14 @@ export default function ReceiptsPage() {
           )}
         </CardContent>
       </Card>
-            {isEditOpen && (
+      
+      {/* ── Edit Modal ── */}
+      {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Edit Receipt</h3>
-              <button onClick={handleCloseEdit} className="text-sm text-muted-foreground">
+              <button onClick={handleCloseEdit} className="text-sm text-muted-foreground hover:text-gray-900">
                 Close
               </button>
             </div>
@@ -464,7 +493,7 @@ export default function ReceiptsPage() {
                 Cancel
               </Button>
               <Button onClick={handleSaveEdit}>
-              Save Changes
+                Save Changes
               </Button>
             </div>
           </div>
