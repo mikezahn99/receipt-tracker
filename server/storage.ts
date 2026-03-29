@@ -21,10 +21,11 @@ export interface IStorage {
   getJobs(): Promise<Job[]>;
   getJob(id: number): Promise<Job | undefined>;
   createJob(job: InsertJob): Promise<Job>;
-  
-  // THE FIX 1: Add the missing blueprints to the interface
   getActiveJobs(): Promise<Job[]>;
   updateJob(id: number, job: Partial<InsertJob>): Promise<Job | undefined>;
+  
+  // THE FIX: Add the delete blueprint
+  deleteJob(id: number): Promise<boolean>;
   
   sessionStore: session.Store;
 }
@@ -117,15 +118,19 @@ export class DatabaseStorage implements IStorage {
     return job;
   }
 
-  // THE FIX 2: Teach the database how to fetch only active jobs
   async getActiveJobs(): Promise<Job[]> {
     return await db.select().from(jobs).where(eq(jobs.status, "Active"));
   }
 
-  // THE FIX 3: Teach the database how to update (deactivate) a job
   async updateJob(id: number, update: Partial<InsertJob>): Promise<Job | undefined> {
     const [updated] = await db.update(jobs).set(update).where(eq(jobs.id, id)).returning();
     return updated;
+  }
+
+  // THE FIX: Teach the database how to run the demolition
+  async deleteJob(id: number): Promise<boolean> {
+    await db.delete(jobs).where(eq(jobs.id, id));
+    return true;
   }
 }
 
