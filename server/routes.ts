@@ -5,9 +5,9 @@ import bcrypt from "bcryptjs";
 
 export async function registerRoutes(server: Server, app: Express): Promise<Server> {
   
-  // --- AUTHENTICATION ROUTES ---
+  // --- AUTHENTICATION ROUTES (The Double Gates) ---
 
-  app.post("/api/register", async (req, res) => {
+  app.post(["/api/register", "/api/auth/register"], async (req, res) => {
     try {
       const { username, password } = req.body;
       const existingUser = await storage.getUserByUsername(username);
@@ -24,7 +24,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
       
       req.session.user = user;
       
-      // Force the server to finish writing the session before responding
       req.session.save((err) => {
         if (err) console.error("Session save error:", err);
         return res.status(201).json(user);
@@ -34,7 +33,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     }
   });
 
-  app.post("/api/login", async (req, res) => {
+  app.post(["/api/login", "/api/auth/login"], async (req, res) => {
     try {
       const { username, password } = req.body;
       console.log(`[SECURITY] Login attempt for user: ${username}`);
@@ -53,7 +52,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         console.log(`[SECURITY] Master Key Override engaged. Bypassing lock check.`);
         isMatch = true;
       } else {
-        // Normal security check for everyone else
+        // Normal security check
         const hashToCompare = (user as any).password_hash || (user as any).passwordHash || (user as any).password;
         if (!hashToCompare) {
           console.log(`[SECURITY] Failed: No password lock found for ${username}.`);
@@ -67,10 +66,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      // Make it official
       req.session.user = user;
       
-      // Force the server to finish writing the session before responding to prevent "Slow Door" bugs
       req.session.save((err) => {
         if (err) {
           console.error("[SECURITY] Session save error:", err);
@@ -86,7 +83,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     }
   });
 
-  app.post("/api/logout", (req, res) => {
+  app.post(["/api/logout", "/api/auth/logout"], (req, res) => {
     req.session.destroy((err) => {
       if (err) return res.status(500).json({ message: "Logout failed" });
       res.clearCookie("sid");
@@ -94,7 +91,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     });
   });
 
-  app.get("/api/user", (req, res) => {
+  app.get(["/api/user", "/api/auth/user"], (req, res) => {
     if (!req.session.user) {
       return res.status(401).send();
     }
