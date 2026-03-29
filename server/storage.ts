@@ -127,8 +127,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // THE FIX: Teach the database how to run the demolition
+ // THE FIX: Teach the database how to run a full demolition
   async deleteJob(id: number): Promise<boolean> {
+    // 1. Safety Sweep: Demolish all receipts tied to this job first
+    await db.delete(receipts).where(eq(receipts.jobId, id));
+    
+    // 2. Main Demolition: Scrap the job itself
     await db.delete(jobs).where(eq(jobs.id, id));
     return true;
   }
