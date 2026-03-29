@@ -3,6 +3,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
 import createSQLiteStore from "connect-sqlite3";
+import bcrypt from "bcryptjs"; // <-- THE DECODER RING
 
 const SQLiteStore = createSQLiteStore(session);
 
@@ -24,13 +25,11 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    // Tell the guard to put the clipboard in the safe on Render
     this.sessionStore = new SQLiteStore({ 
       dir: process.env.NODE_ENV === 'production' ? '/var/data' : './',
       db: "sessions.db" 
     });
     
-    // Check for the admin user on startup
     this.seedAdmin();
   }
 
@@ -39,9 +38,11 @@ export class DatabaseStorage implements IStorage {
       const [adminExists] = await db.select().from(users).where(eq(users.username, "admin"));
       if (!adminExists) {
         console.log("Master Key missing from SQLite. Creating 'admin' user...");
+        // Scramble the master password before storing it
+        const hashedPassword = await bcrypt.hash("changeme123", 10);
         await this.createUser({
           username: "admin",
-          password: "changeme123"
+          password: hashedPassword
         });
       }
     } catch (error) {
