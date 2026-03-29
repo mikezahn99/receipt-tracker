@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
-import bcrypt from "bcryptjs"; // <-- THE DECODER RING
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(server: Server, app: Express): Promise<Server> {
   
@@ -15,9 +15,12 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         return res.status(400).json({ message: "Username already exists" });
       }
       
-      // Scramble the password before we put it in the safe
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await storage.createUser({ username, password: hashedPassword });
+      const user = await storage.createUser({ 
+        username, 
+        password: hashedPassword,
+        password_hash: hashedPassword // The extra label
+      } as any);
       
       req.session.user = user;
       return res.status(201).json(user);
@@ -35,8 +38,10 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      // Use the decoder to check if the typed password matches the scrambled lock
-      const isMatch = await bcrypt.compare(password, user.password);
+      // Check all possible drawer labels for the scrambled lock
+      const hashToCompare = (user as any).password_hash || (user as any).passwordHash || (user as any).password;
+      
+      const isMatch = await bcrypt.compare(password, hashToCompare);
       if (!isMatch) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
