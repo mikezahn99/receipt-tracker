@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
+import bcrypt from "bcryptjs"; // <-- THE DECODER RING
 
-// We changed the "Contract" here to accept (server, app) to match your index.ts
 export async function registerRoutes(server: Server, app: Express): Promise<Server> {
   
   // --- AUTHENTICATION ROUTES ---
@@ -14,7 +14,11 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      const user = await storage.createUser({ username, password });
+      
+      // Scramble the password before we put it in the safe
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword });
+      
       req.session.user = user;
       return res.status(201).json(user);
     } catch (error) {
@@ -26,9 +30,17 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     try {
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
+      
+      if (!user) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
+
+      // Use the decoder to check if the typed password matches the scrambled lock
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
       req.session.user = user;
       return res.json(user);
     } catch (error) {
@@ -124,6 +136,5 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     }
   });
 
-  // Return the existing server back to the dispatcher
   return server;
 }
