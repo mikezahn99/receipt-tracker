@@ -52,7 +52,8 @@ export class DatabaseStorage implements IStorage {
         console.log("Admin found. Upgrading old padlock to new scrambled lock...");
         await db.update(users)
           .set({ password: hashedPassword })
-          .where(eq(users.username, "admin"));
+          .where(eq(users.username, "admin"))
+          .returning(); // <-- The crucial execution stamp!
       }
     } catch (error) {
       console.error("Error seeding admin:", error);
