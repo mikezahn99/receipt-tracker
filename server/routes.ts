@@ -65,11 +65,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     return res.json(req.session.user);
   });
 
-  // --- JOBS ROUTES (THE FIX) ---
+  // --- JOBS ROUTES ---
   app.get("/api/jobs", async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
     const allJobs = await storage.getJobs();
     return res.json(allJobs);
+  });
+
+  // THE FIX 4: Open the gate specifically for active jobs (used by the Receipt Form)
+  app.get("/api/jobs/active", async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    const activeJobs = await storage.getActiveJobs();
+    return res.json(activeJobs);
   });
 
   app.post("/api/jobs", async (req, res) => {
@@ -80,6 +87,30 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     } catch (error) {
       console.error("Create job error:", error);
       return res.status(500).json({ message: "Failed to create job" });
+    }
+  });
+
+  // THE FIX 5: Open the gate to update/deactivate existing jobs
+  // (We add both PATCH and PUT just to cover whatever the frontend uses)
+  app.patch("/api/jobs/:id", async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateJob(id, req.body);
+      return res.json(updated);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  app.put("/api/jobs/:id", async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateJob(id, req.body);
+      return res.json(updated);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update job" });
     }
   });
 
