@@ -24,9 +24,9 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    // We changed the "dir" to "./" so it stays on the main job site
+    // Tell the guard to put the clipboard in the safe on Render
     this.sessionStore = new SQLiteStore({ 
-      dir: "./",
+      dir: process.env.NODE_ENV === 'production' ? '/var/data' : './',
       db: "sessions.db" 
     });
     
