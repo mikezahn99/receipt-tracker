@@ -10,6 +10,7 @@ import NewReceiptPage from "@/pages/new-receipt";
 import JobsPage from "@/pages/jobs";
 import LoginPage from "@/pages/login";
 import AppLayout from "@/components/AppLayout";
+import Navbar from "@/components/Navbar"; // <-- Brought the Navbar out of the toolbox
 
 type AuthUser = {
   id: number;
@@ -43,19 +44,26 @@ function AppRouter() {
     return <div className="p-6">Loading...</div>;
   }
 
+  // If they don't have a badge, keep them at the gate
   if (!authUser) {
     return <LoginPage />;
   }
 
+  // If they are on the clock, hang the Navbar at the very top of the site
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/" component={ReceiptsPage} />
-        <Route path="/new" component={NewReceiptPage} />
-        <Route path="/jobs" component={JobsPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <Navbar /> 
+      <div className="flex-1">
+        <AppLayout>
+          <Switch>
+            <Route path="/" component={ReceiptsPage} />
+            <Route path="/new" component={NewReceiptPage} />
+            <Route path="/jobs" component={JobsPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </div>
+    </div>
   );
 }
 
