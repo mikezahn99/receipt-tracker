@@ -91,7 +91,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     });
   });
 
-  app.get(["/api/user", "/api/auth/user"], (req, res) => {
+  // THE FIX: Added /api/auth/me and /api/me to the guard's patrol
+  app.get(["/api/user", "/api/auth/user", "/api/me", "/api/auth/me"], (req, res) => {
     if (!req.session.user) {
       return res.status(401).send();
     }
