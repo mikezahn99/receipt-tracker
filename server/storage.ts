@@ -35,15 +35,24 @@ export class DatabaseStorage implements IStorage {
 
   private async seedAdmin() {
     try {
-      const [adminExists] = await db.select().from(users).where(eq(users.username, "admin"));
-      if (!adminExists) {
+      // 1. Check if the admin is already in the safe
+      const [admin] = await db.select().from(users).where(eq(users.username, "admin"));
+      
+      // 2. Prepare the new high-security scrambled lock
+      const hashedPassword = await bcrypt.hash("changeme123", 10);
+
+      if (!admin) {
         console.log("Master Key missing from SQLite. Creating 'admin' user...");
-        // Scramble the master password before storing it
-        const hashedPassword = await bcrypt.hash("changeme123", 10);
         await this.createUser({
           username: "admin",
           password: hashedPassword
         });
+      } else {
+        // 3. THE FIX: If the admin exists, forcibly upgrade their lock
+        console.log("Admin found. Upgrading old padlock to new scrambled lock...");
+        await db.update(users)
+          .set({ password: hashedPassword })
+          .where(eq(users.username, "admin"));
       }
     } catch (error) {
       console.error("Error seeding admin:", error);
