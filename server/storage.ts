@@ -3,7 +3,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
 import createSQLiteStore from "connect-sqlite3";
-import bcrypt from "bcryptjs"; // <-- THE DECODER RING
+import bcrypt from "bcryptjs"; 
 
 const SQLiteStore = createSQLiteStore(session);
 
@@ -35,30 +35,24 @@ export class DatabaseStorage implements IStorage {
 
   private async seedAdmin() {
     try {
-      // 1. Check if the admin is already in the safe
       const [admin] = await db.select().from(users).where(eq(users.username, "admin"));
-      
-      // 2. Prepare the new high-security scrambled lock
       const hashedPassword = await bcrypt.hash("changeme123", 10);
 
       if (!admin) {
         console.log("Master Key missing from SQLite. Creating 'admin' user...");
         await this.createUser({
           username: "admin",
-          password: hashedPassword
-        });
+          password: hashedPassword,
+          password_hash: hashedPassword // The extra label
+        } as any);
       } else {
-        // 3. THE BOLT CUTTER FIX: Delete the old account and rebuild it instantly
         console.log("Admin found but lock is old. Cutting it off and replacing...");
-        
-        // Scrap the old account
         await db.delete(users).where(eq(users.username, "admin"));
-        
-        // Build the new one with the secure lock
         await this.createUser({
           username: "admin",
-          password: hashedPassword
-        });
+          password: hashedPassword,
+          password_hash: hashedPassword // The extra label
+        } as any);
       }
     } catch (error) {
       console.error("Error seeding admin:", error);
@@ -76,7 +70,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    // Put all possible labels on the folder so Drizzle finds the right drawer
+    const dataToInsert: any = {
+      ...insertUser,
+      password_hash: (insertUser as any).password_hash || (insertUser as any).password,
+      passwordHash: (insertUser as any).passwordHash || (insertUser as any).password
+    };
+    const [user] = await db.insert(users).values(dataToInsert).returning();
     return user;
   }
 
