@@ -132,7 +132,6 @@ app.post("/api/jobs", async (req, res) => {
     if (!user) return res.status(401).json({ message: "Not logged in" });
     
     try {
-      // THE FIX: Hardwire the Owner Tag directly to the frontend dropdown response
       const jobData = {
         jobName: req.body.jobName,
         status: req.body.status,
@@ -140,6 +139,7 @@ app.post("/api/jobs", async (req, res) => {
         userId: req.body.isPersonal ? user.id : null
       };
 
+      // THE FIX: This must say 'storage.createJob', NOT 'me.createJob'
       const job = await storage.createJob(jobData);
       return res.status(201).json(job);
     } catch (error) {
