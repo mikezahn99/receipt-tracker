@@ -80,6 +80,8 @@ export default function ReceiptsPage() {
   };
 
   // ── Data fetching ──
+  const { data: user } = useQuery<any>({ queryKey: ["/api/me"] });
+  
   const {
     data: receipts,
     isLoading: receiptsLoading,
@@ -201,11 +203,12 @@ export default function ReceiptsPage() {
       return;
     }
 
-    // 1. Build the company header block based on the paper form
+   // 1. Build the company header block
+    const userName = user?.fullName || user?.username || "Account Holder";
     const headerRows = [
       `"Mountain View Development & Contracting Co., Inc."`,
       `"Expense Tracker"`,
-      `"Name: Michael Zahn"`,
+      `"Name: ${userName}"`,
       `""`, // Blank line for spacing
       `"Date","Purchased From","Job","Description/Fuel Type","Fuel Gallons","Amount"`
     ];
