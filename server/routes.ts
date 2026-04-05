@@ -48,14 +48,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
       
      const hashedPassword = await bcrypt.hash(password, 10);
       
-      // THE FIX: Use the exact 'passwordHash' key that your schema.ts demands
-      const user = await storage.createUser({ 
-        username, 
-        passwordHash: hashedPassword, 
-        fullName: fullName || "",
-        email: email || ""
-      } as any);
-      
       // THE FIX: Save the new fields to the database
       const user = await storage.createUser({ 
         username, 
