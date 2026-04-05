@@ -1,6 +1,6 @@
 import { users, receipts, jobs, type User, type InsertUser, type Receipt, type InsertReceipt, type Job, type InsertJob } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, or, isNull, and } from "drizzle-orm";
 import session from "express-session";
 import createSQLiteStore from "connect-sqlite3";
 import bcrypt from "bcryptjs"; 
@@ -19,10 +19,10 @@ export interface IStorage {
   updateReceipt(id: number, receipt: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: number): Promise<boolean>;
 
-  getJobs(): Promise<Job[]>;
+  getJobs(userId: number, role: string): Promise<Job[]>;
   getJob(id: number): Promise<Job | undefined>;
   createJob(job: InsertJob): Promise<Job>;
-  getActiveJobs(): Promise<Job[]>;
+  getActiveJobs(userId: number, role: string): Promise<Job[]>;
   updateJob(id: number, job: Partial<InsertJob>): Promise<Job | undefined>;
   
   // THE FIX: Add the delete blueprint
