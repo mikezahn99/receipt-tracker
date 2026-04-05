@@ -5,6 +5,7 @@ export default defineConfig({
   schema: "./shared/schema.ts",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./data.db",
+    // THE FIX: Point to the exact same vault the live app uses!
+    url: process.env.NODE_ENV === 'production' ? '/var/data/data.db' : './sqlite.db',
   },
 });
