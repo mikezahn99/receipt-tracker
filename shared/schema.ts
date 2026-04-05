@@ -38,14 +38,16 @@ export const jobs = sqliteTable("jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   jobName: text("job_name").notNull(),
   status: text("status").notNull().default("Active"),
+  // THE FIX: Add the Owner Tag. Null = Company Job. Number = Personal Truck.
+  userId: integer("user_id"),
 });
 
-// THE FIX: Explicitly tell the inspector to accept standard strings
 export const insertJobSchema = createInsertSchema(jobs)
   .omit({ id: true })
   .extend({
     jobName: z.string().min(1, "Job name is required"),
     status: z.string().default("Active"),
+    userId: z.number().nullable().optional(),
   });
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
