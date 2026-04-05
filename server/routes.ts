@@ -252,17 +252,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         // The absolute largest number on the receipt is the final total.
         total = allPrices[0];
       }
-      
-      if (possibleTotals.length > 0) {
-        // The final total is almost always the largest number attached to these keywords
-        total = Math.max(...possibleTotals);
-      } else {
-        // 2. FALLBACK: If it can't find the word "Total", just grab the absolute largest price on the receipt
-        const allPrices = rawText.match(/\b\d+\.\d{2}\b/g);
-        if (allPrices) {
-          total = Math.max(...allPrices.map(n => parseFloat(n)));
-        }
-      }
 
       // -- Find Gallons & Fuel Category --
       const gallonMatch = rawText.match(/(\d+\.\d{3})\s*(gal|g|gallons)/i);
