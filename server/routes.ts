@@ -112,6 +112,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
   app.get("/api/jobs", async (req, res) => {
     const user = req.session.user;
     if (!user) return res.status(401).json({ message: "Not logged in" });
+    
+    // THE FIX: Pass the user ID and Badge to the database
     const allJobs = await storage.getJobs(user.id, user.role);
     return res.json(allJobs);
   });
@@ -119,6 +121,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
   app.get("/api/jobs/active", async (req, res) => {
     const user = req.session.user;
     if (!user) return res.status(401).json({ message: "Not logged in" });
+    
+    // THE FIX: Pass the user ID and Badge to the database
     const activeJobs = await storage.getActiveJobs(user.id, user.role);
     return res.json(activeJobs);
   });
