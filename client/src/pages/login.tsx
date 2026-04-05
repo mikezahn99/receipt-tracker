@@ -12,21 +12,22 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   
-  // THE FIX: Add the two new state variables to hold the text while typing
+  // The two new state variables to hold the text while typing
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
- const handleAuth = async (e: React.FormEvent) => {
+  // The single, clean handleAuth function
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
 
     const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
 
-    // THE FIX: Only pack the name and email if we are creating a new account
+    // Only pack the name and email if we are creating a new account
     const payload = isLoginView 
       ? { username, password } 
       : { username, password, fullName, email };
@@ -57,41 +58,6 @@ export default function LoginPage() {
     }
   };
 
-    // Tell the form which gate to drive to based on the toggle switch
-    const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // THE FIX: Package up the new fields into the truck before sending it to the server
-        body: JSON.stringify({
-          username,
-          password,
-          fullName,
-          email
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || (isLoginView ? "Login failed" : "Registration failed"));
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Success! Drive through to the dashboard
-      setLocation("/");
-      window.location.reload();
-    } catch (err) {
-      setError(isLoginView ? "Login failed" : "Registration failed");
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-muted/30 px-4">
       
@@ -100,7 +66,6 @@ export default function LoginPage() {
         <div className="bg-primary p-3 rounded-full mb-3 shadow-sm">
           <HardHat className="h-10 w-10 text-white" />
         </div>
-        {/* THE FIX: Updated the sign to ReceiptLog! */}
         <h1 className="text-3xl font-bold text-gray-900">ReceiptLog</h1>
       </div>
 
@@ -114,7 +79,7 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
             
-            {/* THE FIX: Conditionally display Full Name and Email ONLY when registering */}
+            {/* Conditionally display Full Name and Email ONLY when registering */}
             {!isLoginView && (
               <>
                 <div>
