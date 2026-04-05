@@ -17,6 +17,9 @@ export const users = sqliteTable("users", {
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
+  // THE FIX: Add the two new columns here
+  fullName: text("full_name").default(""),
+  email: text("email").default(""),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
