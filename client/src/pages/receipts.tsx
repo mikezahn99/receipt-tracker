@@ -202,11 +202,31 @@ export default function ReceiptsPage() {
     window.location.reload();
   };
   
-  const sortedReceipts = receipts ? [...receipts].sort((a, b) => {
+  // THE FIX: The Front-Desk Sorter
+  // 1. Throw out any receipts that don't match the active filters
+  const filteredReceipts = receipts ? receipts.filter(r => {
+    // Grab the date string (YYYY-MM-DD)
+    const dateStr = r.purchaseDate || (r.createdAt ? r.createdAt.substring(0, 10) : "");
+    
+    // Check Date Range
+    if (startDate && dateStr < startDate) return false;
+    if (endDate && dateStr > endDate) return false;
+    
+    // Check Job Filter
+    if (jobFilter !== "all" && String(r.jobId) !== jobFilter) return false;
+    
+    // Check Category Filter
+    if (categoryFilter !== "all" && r.category !== categoryFilter) return false;
+    
+    return true; // If it passes all tests, keep it
+  }) : [];
+
+  // 2. Sort the remaining valid receipts by date
+  const sortedReceipts = [...filteredReceipts].sort((a, b) => {
     const dateA = new Date(a.purchaseDate || a.createdAt).getTime();
     const dateB = new Date(b.purchaseDate || b.createdAt).getTime();
     return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-  }) : [];
+  });
 
   // THE FIX: The CSV Exporter Logic
   const handleExportCSV = () => {
