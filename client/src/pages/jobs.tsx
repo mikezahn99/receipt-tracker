@@ -2,7 +2,7 @@
  * Jobs Page
  *
  * Displays all jobs and allows:
- * - Creating new jobs or personal trucks
+ * - Creating Company (Public) or Personal (Private) jobs/trucks
  * - Toggling job status (Active / Inactive)
  * - Deleting jobs permanently
  */
@@ -20,6 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,28 +37,24 @@ import { PlusCircle, Briefcase, ToggleLeft, ToggleRight, Trash2 } from "lucide-r
 export default function JobsPage() {
   const { toast } = useToast();
   const [newJobName, setNewJobName] = useState("");
-  const [isPersonalTruck, setIsPersonalTruck] = useState(false); // Admin checkbox state
+  // THE FIX: New state for the dropdown menu
+  const [jobType, setJobType] = useState<"company" | "personal">("company");
 
-  // ── Fetch User & Badge ──
   const { data: user } = useQuery<any>({ queryKey: ["/api/me"] });
   const isAdmin = user?.role === "admin";
 
-  // ── Fetch all jobs ──
   const { data: jobs, isLoading } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
   });
 
-  // ── Create job mutation ──
   const createMutation = useMutation({
     mutationFn: async (jobName: string) => {
-      const payload: any = { jobName, status: "Active" };
-      
-      // If Admin explicitly checks the "Personal Truck" box, stamp it with their ID.
-      // (If a regular crew member submits, the backend automatically stamps it for them!)
-      if (isAdmin && isPersonalTruck && user?.id) {
-        payload.userId = user.id;
-      }
-
+      // Send the 'isPersonal' flag to the backend based on the dropdown
+      const payload = { 
+        jobName, 
+        status: "Active",
+        isPersonal: jobType === "personal" 
+      };
       const res = await apiRequest("POST", "/api/jobs", payload);
       return res.json();
     },
@@ -59,7 +62,6 @@ export default function JobsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs/active"] });
       setNewJobName("");
-      setIsPersonalTruck(false);
       toast({ title: "Success", description: "Added successfully." });
     },
     onError: (err: Error) => {
@@ -67,7 +69,6 @@ export default function JobsPage() {
     },
   });
 
-  // ── Toggle status mutation ──
   const toggleMutation = useMutation({
     mutationFn: async ({ id, currentStatus }: { id: number; currentStatus: string }) => {
       const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
@@ -83,7 +84,6 @@ export default function JobsPage() {
     },
   });
 
-  // ── Delete mutation ──
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/jobs/${id}`);
@@ -117,15 +117,13 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className="space-y-4 max-w-5xl">
       <div>
         <h2 className="text-xl font-semibold text-foreground" data-testid="page-title">
-          {isAdmin ? "Company Jobs & Trucks" : "My Trucks & Company Jobs"}
+          Jobs & Trucks
         </h2>
         <p className="text-sm text-muted-foreground">
-          {isAdmin 
-            ? "Manage the master list of jobs and your personal trucks."
-            : "Add your personal truck to log fuel, and view active company jobs."}
+          Manage company-wide jobs or your own personal equipment.
         </p>
       </div>
 
@@ -134,40 +132,37 @@ export default function JobsPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <PlusCircle className="h-4 w-4" />
-            {isAdmin ? "Add New Job or Truck" : "Add Personal Truck"}
+            Add New Record
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder={isAdmin ? "Job name, e.g., Bridge Repair..." : "Truck number, e.g., F-250 #14"}
-                value={newJobName}
-                onChange={(e) => setNewJobName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                data-testid="input-new-job"
-              />
-              <Button
-                onClick={handleCreate}
-                disabled={createMutation.isPending}
-                data-testid="button-add-job"
-              >
-                Add
-              </Button>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-center">
+            <Input
+              placeholder="Job name or Truck number..."
+              value={newJobName}
+              onChange={(e) => setNewJobName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              data-testid="input-new-job"
+            />
             
-            {/* The Admin-Only Checkbox */}
-            {isAdmin && (
-              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer w-fit">
-                <input 
-                  type="checkbox" 
-                  checked={isPersonalTruck}
-                  onChange={(e) => setIsPersonalTruck(e.target.checked)}
-                  className="rounded border-gray-300 w-4 h-4"
-                />
-                Make this a Personal Truck (Hide from the crew)
-              </label>
-            )}
+            {/* THE FIX: The new public/private dropdown for everyone */}
+            <Select value={jobType} onValueChange={(val: "company" | "personal") => setJobType(val)}>
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="company">Company (Public to all)</SelectItem>
+                <SelectItem value="personal">Personal (Private to me)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              onClick={handleCreate}
+              disabled={createMutation.isPending}
+              data-testid="button-add-job"
+            >
+              Add
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -186,7 +181,7 @@ export default function JobsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead className="w-[130px]">Type</TableHead>
+                  <TableHead className="w-[150px]">Visibility</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[180px] text-right">Actions</TableHead>
                 </TableRow>
@@ -196,15 +191,14 @@ export default function JobsPage() {
                   <TableRow key={job.id} data-testid={`job-row-${job.id}`}>
                     <TableCell className="text-sm font-medium">{job.jobName}</TableCell>
                     
-                    {/* The Visual Type Badge */}
                     <TableCell>
                       {job.userId ? (
                         <Badge variant="outline" className="text-xs text-blue-600 bg-blue-50 border-blue-200">
-                          Personal Truck
+                          Personal (Private)
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-gray-600 bg-gray-50 border-gray-200">
-                          Company Job
+                          Company (Public)
                         </Badge>
                       )}
                     </TableCell>
@@ -217,7 +211,6 @@ export default function JobsPage() {
                       )}
                     </TableCell>
                     
-                    {/* The Security Gateway for Actions */}
                     <TableCell className="text-right">
                       {isAdmin || job.userId === user?.id ? (
                         <div className="flex items-center justify-end gap-2">
