@@ -89,6 +89,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(receipts).where(eq(receipts.userId, userId));
   }
 
+  async getAllReceipts(): Promise<Receipt[]> {
+    return await db.select().from(receipts);
+  }
+  
   async createReceipt(insertReceipt: InsertReceipt & { userId: number }): Promise<Receipt> {
     const [receipt] = await db.insert(receipts).values(insertReceipt).returning();
     return receipt;
