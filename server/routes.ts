@@ -39,14 +39,24 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
 
 
   // ─── AUTHENTICATION ROUTES ───
-  app.post(["/api/register", "/api/auth/register"], async (req, res) => {
+ app.post(["/api/register", "/api/auth/register"], async (req, res) => {
     try {
-      const { username, password } = req.body;
+      // THE FIX: Pull the new fields from the incoming form
+      const { username, password, fullName, email } = req.body;
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) return res.status(400).json({ message: "Username already exists" });
       
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await storage.createUser({ username, password: hashedPassword, password_hash: hashedPassword } as any);
+      
+      // THE FIX: Save the new fields to the database
+      const user = await storage.createUser({ 
+        username, 
+        password: hashedPassword, 
+        password_hash: hashedPassword,
+        fullName: fullName || "",
+        email: email || ""
+      } as any);
+// ... the rest stays the same
       
       req.session.user = user;
       req.session.save((err) => {
