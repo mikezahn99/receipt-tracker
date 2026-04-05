@@ -8,7 +8,7 @@
  * 4. User reviews/edits all fields, selects a job, and saves.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -80,8 +80,18 @@ export default function NewReceiptPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  // ── State ──
-  const [useOcr, setUseOcr] = useState(true); // THE FIX: State for the toggle switch
+ // ── State ──
+  // Check the browser's glovebox (localStorage) to see what the user set it to last time.
+  // If there's no note in the glovebox yet, default to true (ON).
+  const [useOcr, setUseOcr] = useState(() => {
+    const saved = localStorage.getItem("paveTrack_useOcr");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  // Whenever the useOcr switch is flipped, write the new setting down and put it in the glovebox.
+  useEffect(() => {
+    localStorage.setItem("paveTrack_useOcr", JSON.stringify(useOcr));
+  }, [useOcr]);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [rawOcrText, setRawOcrText] = useState<string>("");
