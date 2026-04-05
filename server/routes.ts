@@ -164,7 +164,9 @@ app.post("/api/jobs", async (req, res) => {
       const updated = await storage.updateJob(id, req.body);
       return res.json(updated);
     } catch (error) {
-      return res.status(500).json({ message: "Failed to update job" });
+      // THE FIX: The Diagnostic Tripwire
+      console.error("Job Demolition Error:", error);
+      return res.status(500).json({ message: "Failed to delete job" });
     }
   });
 
