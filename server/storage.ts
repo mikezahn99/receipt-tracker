@@ -14,6 +14,7 @@ export interface IStorage {
   
   getReceipt(id: number): Promise<Receipt | undefined>;
   getReceipts(userId: number): Promise<Receipt[]>;
+  getAllReceipts(): Promise<Receipt[]>;
   createReceipt(receipt: InsertReceipt & { userId: number }): Promise<Receipt>;
   updateReceipt(id: number, receipt: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: number): Promise<boolean>;
