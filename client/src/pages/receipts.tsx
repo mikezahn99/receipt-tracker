@@ -6,6 +6,7 @@
  *
  * Filters: date range, job, category (Fuel / Other).
  * Sorting: Newest First, Oldest First.
+ * Export: Generates a CSV matching the company expense report.
  */
 
 import { useState, type ChangeEvent } from "react";
@@ -35,16 +36,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Filter, Fuel, ShoppingBag, ArrowUpDown } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  PlusCircle, 
+  Filter, 
+  Fuel, 
+  ShoppingBag, 
+  ArrowUpDown,
+  Download
+} from "lucide-react";
 
 export default function ReceiptsPage() {
+  const { toast } = useToast();
+  
   // ── Filter state ──
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [jobFilter, setJobFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  
-  // THE FIX 1: Add a Sort State (Default to newest first)
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -86,7 +95,6 @@ export default function ReceiptsPage() {
     queryKey: ["/api/jobs"],
   });
 
-  // Map job IDs to names for display
   const jobMap = new Map(allJobs?.map((j) => [j.id, j.jobName]) ?? []);
 
   const clearFilters = () => {
@@ -94,7 +102,7 @@ export default function ReceiptsPage() {
     setEndDate("");
     setJobFilter("all");
     setCategoryFilter("all");
-    setSortOrder("desc"); // Reset sort order too
+    setSortOrder("desc");
   };
   
   const truncateText = (text?: string | null, maxLength = 32) => {
@@ -146,9 +154,7 @@ export default function ReceiptsPage() {
 
     const response = await fetch(`/api/receipts/${editingReceiptId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant: editForm.merchant,
         purchaseDate: editForm.purchaseDate || null,
@@ -173,32 +179,78 @@ export default function ReceiptsPage() {
     const confirmed = window.confirm("Delete this receipt?");
     if (!confirmed) return;
 
-    const response = await fetch(`/api/receipts/${id}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(`/api/receipts/${id}`, { method: "DELETE" });
 
     if (!response.ok) {
       alert("Failed to delete receipt");
       return;
     }
-
     window.location.reload();
   };
   
-  // THE FIX 2: Sort the receipts array dynamically before rendering
   const sortedReceipts = receipts ? [...receipts].sort((a, b) => {
-    // If there's no purchase date, fall back to when the receipt was created in the app
     const dateA = new Date(a.purchaseDate || a.createdAt).getTime();
     const dateB = new Date(b.purchaseDate || b.createdAt).getTime();
     return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
   }) : [];
+
+  // THE FIX: The CSV Exporter Logic
+  const handleExportCSV = () => {
+    if (!sortedReceipts || sortedReceipts.length === 0) {
+      toast({ title: "No receipts to export", variant: "destructive" });
+      return;
+    }
+
+    // 1. Build the company header block based on the paper form
+    const headerRows = [
+      `"Mountain View Development & Contracting Co., Inc."`,
+      `"Expense Tracker"`,
+      `"Name: Michael Zahn"`,
+      `""`, // Blank line for spacing
+      `"Date","Purchased From","Job","Description/Fuel Type","Fuel Gallons","Amount"`
+    ];
+
+    // 2. Loop through the currently filtered receipts and map them to columns
+    const dataRows = sortedReceipts.map((r) => {
+      const date = r.purchaseDate ? format(parseISO(r.purchaseDate), "MM/dd/yyyy") : "";
+      
+      // Quotes and .replace prevent commas inside the text from breaking the CSV layout
+      const merchant = `"${(r.merchant || "").replace(/"/g, '""')}"`;
+      const job = `"${(jobMap.get(r.jobId) || "").replace(/"/g, '""')}"`;
+      
+      let description = r.notes || "";
+      if (r.category === "Fuel" && !description.toLowerCase().includes("fuel")) {
+        description = `Fuel - ${description}`;
+      }
+      const cleanDesc = `"${description.replace(/"/g, '""')}"`;
+      
+      const gallons = r.gallons != null ? r.gallons : "";
+      const amount = r.total != null ? r.total : "";
+
+      return `${date},${merchant},${job},${cleanDesc},${gallons},${amount}`;
+    });
+
+    // 3. Assemble the file and trigger the browser download
+    const csvContent = [...headerRows, ...dataRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Expense_Report_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Export complete", description: "Your spreadsheet has been downloaded." });
+  };
 
   const hasFilters = startDate || endDate || jobFilter !== "all" || categoryFilter !== "all";
 
   return (
     <div className="space-y-4 max-w-5xl">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-foreground" data-testid="page-title">
             Receipts
@@ -207,12 +259,20 @@ export default function ReceiptsPage() {
             {receipts ? `${receipts.length} receipt${receipts.length !== 1 ? "s" : ""}` : "Loading..."}
           </p>
         </div>
-        <Link href="/new">
-          <Button data-testid="button-new-receipt">
-            <PlusCircle className="h-4 w-4 mr-1.5" />
-            New Receipt
+        
+        {/* THE FIX: Added the Export Button next to the New Receipt Button */}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV} className="bg-white">
+            <Download className="h-4 w-4 mr-1.5" />
+            Export CSV
           </Button>
-        </Link>
+          <Link href="/new">
+            <Button data-testid="button-new-receipt">
+              <PlusCircle className="h-4 w-4 mr-1.5" />
+              New Receipt
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── Filters ── */}
@@ -270,8 +330,6 @@ export default function ReceiptsPage() {
                 </SelectContent>
               </Select>
             </div>
-            
-            {/* THE FIX 3: The Sort Dropdown */}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1">
                 <ArrowUpDown className="h-3 w-3" /> Sort Date
@@ -326,7 +384,6 @@ export default function ReceiptsPage() {
                   </TableRow> 
                 </TableHeader>                
                 <TableBody>
-                  {/* THE FIX 4: Map over the new sortedReceipts array instead of the raw data */}
                   {sortedReceipts.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="text-sm whitespace-nowrap">
