@@ -11,6 +11,11 @@ export default function LoginPage() {
   const [isLoginView, setIsLoginView] = useState(true); // The Toggle Switch
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  
+  // THE FIX: Add the two new state variables to hold the text while typing
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,9 +33,12 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        // THE FIX: Package up the new fields into the truck before sending it to the server
         body: JSON.stringify({
           username,
           password,
+          fullName,
+          email
         }),
       });
 
@@ -59,7 +67,8 @@ export default function LoginPage() {
         <div className="bg-primary p-3 rounded-full mb-3 shadow-sm">
           <HardHat className="h-10 w-10 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900">PaveTrack</h1>
+        {/* THE FIX: Updated the sign to ReceiptLog! */}
+        <h1 className="text-3xl font-bold text-gray-900">ReceiptLog</h1>
       </div>
 
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
@@ -71,6 +80,35 @@ export default function LoginPage() {
 
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
+            
+            {/* THE FIX: Conditionally display Full Name and Email ONLY when registering */}
+            {!isLoginView && (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Full Name</label>
+                  <Input
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g., Mike Zahn"
+                    autoComplete="name"
+                    required={!isLoginView} // Only required if they are signing up
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Email</label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="mike@example.com"
+                    autoComplete="email"
+                    required={!isLoginView} 
+                  />
+                </div>
+              </>
+            )}
+
             <div>
               <label className="mb-1 block text-sm font-medium">Username</label>
               <Input
