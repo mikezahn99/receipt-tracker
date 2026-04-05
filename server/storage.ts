@@ -108,28 +108,30 @@ export class DatabaseStorage implements IStorage {
     return true; 
   }
 
-  // --- JOB METHODS ---
-  async getJobs(): Promise<Job[]> {
-    return await db.select().from(jobs);
+ // --- JOB METHODS ---
+  async getJobs(userId: number, role: string): Promise<Job[]> {
+    if (role === "admin") {
+      // Admin sees absolutely everything
+      return await db.select().from(jobs);
+    } else {
+      // Crew only sees Company jobs (null) OR their own personal trucks
+      return await db.select().from(jobs).where(
+        or(isNull(jobs.userId), eq(jobs.userId, userId))
+      );
+    }
   }
 
-  async getJob(id: number): Promise<Job | undefined> {
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
-    return job;
-  }
-
-  async createJob(insertJob: InsertJob): Promise<Job> {
-    const [job] = await db.insert(jobs).values(insertJob).returning();
-    return job;
-  }
-
-  async getActiveJobs(): Promise<Job[]> {
-    return await db.select().from(jobs).where(eq(jobs.status, "Active"));
-  }
-
-  async updateJob(id: number, update: Partial<InsertJob>): Promise<Job | undefined> {
-    const [updated] = await db.update(jobs).set(update).where(eq(jobs.id, id)).returning();
-    return updated;
+  async getActiveJobs(userId: number, role: string): Promise<Job[]> {
+    if (role === "admin") {
+      return await db.select().from(jobs).where(eq(jobs.status, "Active"));
+    } else {
+      return await db.select().from(jobs).where(
+        and(
+          eq(jobs.status, "Active"),
+          or(isNull(jobs.userId), eq(jobs.userId, userId))
+        )
+      );
+    }
   }
 
  // THE FIX: Teach the database how to run a full demolition
