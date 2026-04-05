@@ -37,7 +37,7 @@ export default function Navbar() {
               <HardHat className="h-6 w-6 text-white" />
             </div>
             <Link href="/" className="text-xl font-bold text-gray-900 cursor-pointer">
-              PaveTrack
+              ReceiptTrack
             </Link>
           </div>
 
