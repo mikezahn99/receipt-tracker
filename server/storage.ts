@@ -108,7 +108,7 @@ export class DatabaseStorage implements IStorage {
     return true; 
   }
 
- // --- JOB METHODS ---
+// --- JOB METHODS ---
   async getJobs(userId: number, role: string): Promise<Job[]> {
     if (role === "admin") {
       // Admin sees absolutely everything
@@ -134,15 +134,27 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
- // THE FIX: Teach the database how to run a full demolition
-  async deleteJob(id: number): Promise<boolean> {
-    // 1. Safety Sweep: Demolish all receipts tied to this job first
-    await db.delete(receipts).where(eq(receipts.jobId, id));
-    
-    // 2. Main Demolition: Scrap the job itself
-    await db.delete(jobs).where(eq(jobs.id, id));
-    return true;
+  // THE FIX: Restoring the accidentally deleted tools!
+  async getJob(id: number): Promise<Job | undefined> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    return job;
   }
-}
+
+  async createJob(insertJob: InsertJob): Promise<Job> {
+    const [job] = await db.insert(jobs).values(insertJob).returning();
+    return job;
+  }
+
+  async updateJob(id: number, update: Partial<InsertJob>): Promise<Job | undefined> {
+    const [updated] = await db.update(jobs).set(update).where(eq(jobs.id, id)).returning();
+    return updated;
+  }
+
+  // The Demolition Tool
+  async deleteJob(id: number): Promise<boolean> {
+    await db.delete(jobs).where(eq(jobs.id, id));
+    return true; 
+  }
+} // <-- End of the DatabaseStorage class
 
 export const storage = new DatabaseStorage();
