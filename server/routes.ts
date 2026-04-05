@@ -108,23 +108,34 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     return res.json(req.session.user);
   });
 
-  // ─── JOBS ROUTES ───
+// ─── JOBS ROUTES ───
   app.get("/api/jobs", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
-    const allJobs = await storage.getJobs();
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
+    const allJobs = await storage.getJobs(user.id, user.role);
     return res.json(allJobs);
   });
 
   app.get("/api/jobs/active", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
-    const activeJobs = await storage.getActiveJobs();
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
+    const activeJobs = await storage.getActiveJobs(user.id, user.role);
     return res.json(activeJobs);
   });
 
   app.post("/api/jobs", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
     try {
-      const job = await storage.createJob(req.body);
+      const jobData = { ...req.body };
+      
+      // Security: If a regular crew member creates a job, FORCE it to be their personal truck.
+      if (user.role !== "admin") {
+        jobData.userId = user.id; 
+      }
+      // (If Admin creates a job, it defaults to null/Company-Wide unless specified)
+
+      const job = await storage.createJob(jobData);
       return res.status(201).json(job);
     } catch (error) {
       return res.status(500).json({ message: "Failed to create job" });
@@ -132,9 +143,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
   });
 
   app.patch("/api/jobs/:id", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
     try {
       const id = Number(req.params.id);
+      const existing = await storage.getJob(id);
+      if (!existing) return res.status(404).json({ message: "Job not found" });
+
+      // Security: Crew can only edit jobs they personally own
+      if (user.role !== "admin" && existing.userId !== user.id) {
+        return res.status(403).json({ message: "Forbidden: You cannot edit company jobs or other people's trucks." });
+      }
+
       const updated = await storage.updateJob(id, req.body);
       return res.json(updated);
     } catch (error) {
@@ -143,9 +163,17 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
   });
 
   app.put("/api/jobs/:id", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
     try {
       const id = Number(req.params.id);
+      const existing = await storage.getJob(id);
+      if (!existing) return res.status(404).json({ message: "Job not found" });
+
+      if (user.role !== "admin" && existing.userId !== user.id) {
+        return res.status(403).json({ message: "Forbidden: You cannot edit company jobs." });
+      }
+
       const updated = await storage.updateJob(id, req.body);
       return res.json(updated);
     } catch (error) {
@@ -154,11 +182,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
   });
 
   app.delete("/api/jobs/:id", async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Not logged in" });
     try {
       const id = Number(req.params.id);
       const existing = await storage.getJob(id);
       if (!existing) return res.status(404).json({ message: "Job not found" });
+      
+      if (user.role !== "admin" && existing.userId !== user.id) {
+        return res.status(403).json({ message: "Forbidden: You cannot delete company jobs." });
+      }
       
       await storage.deleteJob(id);
       return res.status(204).send();
