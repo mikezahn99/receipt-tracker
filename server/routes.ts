@@ -297,11 +297,20 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     }
   });
 
-  app.get("/api/receipts", async (req, res) => {
+app.get("/api/receipts", async (req, res) => {
     const user = req.session.user;
     if (!user) return res.status(401).json({ message: "Not logged in" });
-    const receipts = await storage.getReceipts(user.id);
-    return res.json(receipts);
+    
+    // THE FIX: The Privacy Wall Checkpoint
+    if (user.role === "admin") {
+      // Admin Badge: Hand over the master ledger for the whole company
+      const allReceipts = await storage.getAllReceipts();
+      return res.json(allReceipts);
+    } else {
+      // User Badge: Hand over only the receipts they personally created
+      const userReceipts = await storage.getReceipts(user.id);
+      return res.json(userReceipts);
+    }
   });
 
   app.post("/api/receipts", async (req, res) => {
