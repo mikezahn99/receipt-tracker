@@ -106,6 +106,18 @@ export default function ReceiptsPage() {
     setCategoryFilter("all");
     setSortOrder("desc");
   };
+
+  const setFilterToCurrentMonth = () => {
+    const now = new Date();
+    // 1st day of the current month
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    // 1st day of NEXT month, minus 1 millisecond = last day of current month
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Format them for the HTML input (YYYY-MM-DD)
+    setStartDate(format(firstDay, "yyyy-MM-dd"));
+    setEndDate(format(lastDay, "yyyy-MM-dd"));
+  };
   
   const truncateText = (text?: string | null, maxLength = 32) => {
     if (!text) return "—";
@@ -348,17 +360,28 @@ export default function ReceiptsPage() {
               </Select>
             </div>
           </div>
-          
-          {hasFilters && (
+          <div className="mt-4 flex gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="mt-2 text-xs"
-              onClick={clearFilters}
+              className="text-xs"
+              onClick={setFilterToCurrentMonth}
             >
-              Clear all filters
+              Current Month
             </Button>
-          )}
+            
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={clearFilters}
+              >
+                Clear all filters
+              </Button>
+            )}
+          </div> {/* <-- THE FIX: This closing div was missing! */}
+          
         </CardContent>
       </Card>
 
