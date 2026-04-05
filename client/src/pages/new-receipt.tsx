@@ -3,8 +3,8 @@
  *
  * Workflow:
  * 1. User uploads or captures a photo of a receipt.
- * 2. The image is sent to the backend OCR endpoint.
- * 3. Extracted fields are pre-filled in the form.
+ * 2. If OCR is ON, image is sent to Google Vision; if OFF, just saved.
+ * 3. Extracted fields are pre-filled (if ON).
  * 4. User reviews/edits all fields, selects a job, and saves.
  */
 
@@ -46,10 +46,10 @@ import {
   Fuel,
   ShoppingBag,
   AlertCircle,
+  ScanText
 } from "lucide-react";
 
 // ── Form validation schema ──
-// This mirrors insertReceiptSchema but is specific to the form UI
 const formSchema = z.object({
   merchant: z.string().optional(),
   purchaseDate: z.string().optional(),
@@ -80,13 +80,14 @@ export default function NewReceiptPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  // ── Image upload state ──
+  // ── State ──
+  const [useOcr, setUseOcr] = useState(true); // THE FIX: State for the toggle switch
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [rawOcrText, setRawOcrText] = useState<string>("");
   const [ocrDone, setOcrDone] = useState(false);
 
-  // ── Fetch active jobs for the dropdown ──
+  // ── Fetch active jobs ──
   const { data: activeJobs, isLoading: jobsLoading } = useQuery<Job[]>({
     queryKey: ["/api/jobs/active"],
   });
@@ -107,46 +108,57 @@ export default function NewReceiptPage() {
 
   const watchCategory = form.watch("category");
 
-  // ── OCR mutation ──
+  // ── OCR / Upload mutation ──
   const ocrMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("image", file);
 
-      // We can't use apiRequest for multipart, so use fetch directly
-      // (apiRequest sets Content-Type: application/json)
       const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
-      const res = await fetch(`${API_BASE}/api/receipts/ocr`, {
+      
+      // THE FIX: Attach the skip flag to the URL if the user turned the switch off
+      const res = await fetch(`${API_BASE}/api/receipts/ocr?skip=${!useOcr}`, {
         method: "POST",
         body: formData,
       });
+      
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText || "OCR failed");
+        throw new Error(errText || "Upload failed");
       }
       return res.json();
     },
     onSuccess: (data) => {
-      // Pre-fill form fields with OCR results
+      if (data.imagePath) setImagePath(data.imagePath);
+      if (data.rawOcrText) setRawOcrText(data.rawOcrText);
+      setOcrDone(true);
+
+      // THE FIX: If OCR was turned off, just show a success message and skip the auto-fill
+      if (!useOcr) {
+        toast({
+          title: "Photo attached",
+          description: "Image saved. Please enter the receipt details manually.",
+        });
+        return; 
+      }
+
+      // If OCR was ON, pre-fill the form
       if (data.merchant) form.setValue("merchant", data.merchant);
       if (data.purchaseDate) form.setValue("purchaseDate", data.purchaseDate);
       if (data.total != null) form.setValue("total", String(data.total));
       if (data.category) form.setValue("category", data.category);
       if (data.gallons != null) form.setValue("gallons", String(data.gallons));
-      if (data.imagePath) setImagePath(data.imagePath);
-      if (data.rawOcrText) setRawOcrText(data.rawOcrText);
-      setOcrDone(true);
 
       toast({
         title: "Receipt scanned",
         description: data.rawOcrText
           ? "Fields have been pre-filled from the receipt. Please review before saving."
-          : "No text was detected. You may need to set up your Google Cloud Vision API key, or enter the fields manually.",
+          : "No text was detected. Please enter the fields manually.",
       });
     },
     onError: (err: Error) => {
       toast({
-        title: "OCR Error",
+        title: "Upload Error",
         description: err.message,
         variant: "destructive",
       });
@@ -171,7 +183,6 @@ export default function NewReceiptPage() {
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate the receipts list cache so it refreshes
       queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
       toast({
         title: "Receipt saved",
@@ -193,16 +204,13 @@ export default function NewReceiptPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show preview
     const reader = new FileReader();
     reader.onload = () => setImagePreview(reader.result as string);
     reader.readAsDataURL(file);
 
-    // Send to OCR
     ocrMutation.mutate(file);
   };
 
-  // ── Submit handler ──
   const onSubmit = (values: FormValues) => {
     saveMutation.mutate(values);
   };
@@ -222,27 +230,52 @@ export default function NewReceiptPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* File upload input — "capture" attribute prompts camera on mobile */}
+          
+          {/* THE FIX: The OCR Toggle Switch */}
+          <div className="flex items-center justify-between bg-muted/30 p-3 rounded-md mb-4 border border-border">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                <ScanText className="h-4 w-4 text-primary" />
+                Smart Scanner
+              </span>
+              <span className="text-xs text-muted-foreground mt-0.5">
+                Auto-fill form from photo
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground w-6 text-right">
+                {useOcr ? "ON" : "OFF"}
+              </span>
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-primary cursor-pointer"
+                checked={useOcr}
+                onChange={(e) => setUseOcr(e.target.checked)}
+                disabled={ocrMutation.isPending || imagePreview !== null}
+              />
+            </div>
+          </div>
+
           <label
-            className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
-            data-testid="upload-area"
+            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+              ocrMutation.isPending ? "border-primary/50 bg-muted/50" : "border-border hover:border-primary/50 hover:bg-muted/30"
+            }`}
           >
             {ocrMutation.isPending ? (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="text-sm">Processing receipt...</span>
+                <span className="text-sm">{useOcr ? "Scanning receipt..." : "Saving photo..."}</span>
               </div>
             ) : imagePreview ? (
               <img
                 src={imagePreview}
                 alt="Receipt preview"
                 className="max-h-36 rounded object-contain"
-                data-testid="image-preview"
               />
             ) : (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <Upload className="h-8 w-8" />
-                <span className="text-sm">Tap to upload or take a photo</span>
+                <Upload className="h-8 w-8 mb-1" />
+                <span className="text-sm font-medium">Tap to upload or take a photo</span>
                 <span className="text-xs">PNG, JPG up to 10 MB</span>
               </div>
             )}
@@ -253,17 +286,14 @@ export default function NewReceiptPage() {
               className="hidden"
               onChange={handleFileChange}
               disabled={ocrMutation.isPending}
-              data-testid="input-file"
             />
           </label>
 
-          {/* Show OCR status */}
-          {ocrDone && !rawOcrText && (
+          {ocrDone && !rawOcrText && useOcr && (
             <div className="mt-3 flex items-start gap-2 text-sm text-amber-600 dark:text-amber-400">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                No text was detected. Make sure your Google Cloud Vision API key is configured,
-                or enter the fields manually below.
+                No text was detected. Make sure the photo is clear, or enter fields manually.
               </span>
             </div>
           )}
@@ -278,7 +308,6 @@ export default function NewReceiptPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Category badge */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Category:</span>
                 {watchCategory === "Fuel" ? (
@@ -298,13 +327,11 @@ export default function NewReceiptPage() {
                   onClick={() =>
                     form.setValue("category", watchCategory === "Fuel" ? "Other" : "Fuel")
                   }
-                  data-testid="button-toggle-category"
                 >
                   Switch to {watchCategory === "Fuel" ? "Other" : "Fuel"}
                 </Button>
               </div>
 
-              {/* Merchant */}
               <FormField
                 control={form.control}
                 name="merchant"
@@ -312,18 +339,13 @@ export default function NewReceiptPage() {
                   <FormItem>
                     <FormLabel>Merchant / Place of Purchase</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="e.g., Home Depot"
-                        {...field}
-                        data-testid="input-merchant"
-                      />
+                      <Input placeholder="e.g., Home Depot" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Date and Total side by side */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -332,7 +354,7 @@ export default function NewReceiptPage() {
                     <FormItem>
                       <FormLabel>Purchase Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-date" />
+                        <Input type="date" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,14 +368,7 @@ export default function NewReceiptPage() {
                     <FormItem>
                       <FormLabel>Total Cost ($)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          {...field}
-                          data-testid="input-total"
-                        />
+                        <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -361,7 +376,6 @@ export default function NewReceiptPage() {
                 />
               </div>
 
-              {/* Gallons — only shown when category is Fuel */}
               {watchCategory === "Fuel" && (
                 <FormField
                   control={form.control}
@@ -370,14 +384,7 @@ export default function NewReceiptPage() {
                     <FormItem>
                       <FormLabel>Total Gallons</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          placeholder="0.000"
-                          {...field}
-                          data-testid="input-gallons"
-                        />
+                        <Input type="number" step="0.001" min="0" placeholder="0.000" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -385,7 +392,6 @@ export default function NewReceiptPage() {
                 />
               )}
 
-              {/* Job selection — required */}
               <FormField
                 control={form.control}
                 name="jobId"
@@ -396,15 +402,13 @@ export default function NewReceiptPage() {
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-job">
+                        <SelectTrigger>
                           <SelectValue placeholder="Select a job..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {jobsLoading ? (
-                          <div className="p-2">
-                            <Skeleton className="h-6 w-full" />
-                          </div>
+                          <div className="p-2"><Skeleton className="h-6 w-full" /></div>
                         ) : activeJobs && activeJobs.length > 0 ? (
                           activeJobs.map((job) => (
                             <SelectItem key={job.id} value={String(job.id)}>
@@ -413,7 +417,7 @@ export default function NewReceiptPage() {
                           ))
                         ) : (
                           <div className="p-2 text-sm text-muted-foreground">
-                            No active jobs. Add one in the Jobs page.
+                            No active jobs available.
                           </div>
                         )}
                       </SelectContent>
@@ -423,7 +427,6 @@ export default function NewReceiptPage() {
                 )}
               />
 
-              {/* Notes / Description */}
               <FormField
                 control={form.control}
                 name="notes"
@@ -431,38 +434,19 @@ export default function NewReceiptPage() {
                   <FormItem>
                     <FormLabel>Description / Notes</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="What was purchased? Any additional details..."
-                        className="min-h-[80px]"
-                        {...field}
-                        data-testid="input-notes"
-                      />
+                      <Textarea placeholder="What was purchased? Any additional details..." className="min-h-[80px]" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Submit */}
               <div className="flex gap-3 pt-2">
-                <Button
-                  type="submit"
-                  disabled={saveMutation.isPending}
-                  data-testid="button-save"
-                >
-                  {saveMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-1.5" />
-                  )}
+                <Button type="submit" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                   Save Receipt
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/")}
-                  data-testid="button-cancel"
-                >
+                <Button type="button" variant="outline" onClick={() => navigate("/")}>
                   Cancel
                 </Button>
               </div>
@@ -470,20 +454,16 @@ export default function NewReceiptPage() {
           </Form>
         </CardContent>
       </Card>
-
-      {/* ── Raw OCR Text (collapsible, for debugging) ── */}
+      
       {rawOcrText && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Raw OCR Text (debug)
+              Scanner Diagnostics (debug)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre
-              className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md overflow-x-auto whitespace-pre-wrap"
-              data-testid="raw-ocr-text"
-            >
+            <pre className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md overflow-x-auto whitespace-pre-wrap">
               {rawOcrText}
             </pre>
           </CardContent>
