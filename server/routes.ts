@@ -123,17 +123,21 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     return res.json(activeJobs);
   });
 
-  app.post("/api/jobs", async (req, res) => {
+app.post("/api/jobs", async (req, res) => {
     const user = req.session.user;
     if (!user) return res.status(401).json({ message: "Not logged in" });
     try {
-      const jobData = { ...req.body };
+      // THE FIX: Pull the 'isPersonal' flag from the frontend order form
+      const { isPersonal, ...rest } = req.body;
+      const jobData = { ...rest };
       
-      // Security: If a regular crew member creates a job, FORCE it to be their personal truck.
-      if (user.role !== "admin") {
+      if (isPersonal) {
+        // Private: Stamp it with this exact user's ID
         jobData.userId = user.id; 
+      } else {
+        // Public: Leave the Owner Tag blank so everyone can see it
+        jobData.userId = null;
       }
-      // (If Admin creates a job, it defaults to null/Company-Wide unless specified)
 
       const job = await storage.createJob(jobData);
       return res.status(201).json(job);
