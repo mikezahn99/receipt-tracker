@@ -218,14 +218,22 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
         purchaseDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
 
-      // -- Find Total (Smart Parsing) --
-      // 1. Look for exact keywords like "Total", "Visa", "Amount Due" (ignoring Subtotal)
-      const totalRegex = /\b(?:total|amount due|sale|debit|credit|visa|mastercard|mc|amex|cash)\b[\s$:=]*(\d+\.\d{2})/gi;
-      let match;
-      let possibleTotals: number[] = [];
+     // -- Find Total (The "Biggest Number" Strategy) --
+      // OCR often separates the word "Total" from the actual price. 
+      // Instead of relying on words, we scan the entire paper for every single decimal number.
+      const allPricesMatch = rawText.match(/\b\d{1,5}\.\d{2}\b/g);
       
-      while ((match = totalRegex.exec(rawText)) !== null) {
-        possibleTotals.push(parseFloat(match[1]));
+      if (allPricesMatch) {
+        // Convert all found prices into an array of real numbers
+        let allPrices = allPricesMatch.map(n => parseFloat(n));
+        
+        // Sort them from biggest to smallest
+        allPrices.sort((a, b) => b - a);
+        
+        // The absolute largest number on the receipt is the final total.
+        // (This works perfectly as long as you didn't pay with a $100 cash bill, 
+        // where the "Amount Tendered" might technically be higher than the total).
+        total = allPrices[0];
       }
       
       if (possibleTotals.length > 0) {
