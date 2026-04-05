@@ -19,10 +19,43 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAuth = async (e: React.FormEvent) => {
+ const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
+
+    const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
+
+    // THE FIX: Only pack the name and email if we are creating a new account
+    const payload = isLoginView 
+      ? { username, password } 
+      : { username, password, fullName, email };
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || (isLoginView ? "Login failed" : "Registration failed"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Success! Drive through to the dashboard
+      setLocation("/");
+      window.location.reload();
+    } catch (err) {
+      setError(isLoginView ? "Login failed" : "Registration failed");
+      setIsSubmitting(false);
+    }
+  };
 
     // Tell the form which gate to drive to based on the toggle switch
     const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
