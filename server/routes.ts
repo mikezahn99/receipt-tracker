@@ -181,6 +181,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
 
+    // --- THE BYPASS VALVE ---
+    // If the frontend tells us to skip OCR, just save the photo and return early
+    if (req.query.skip === 'true') {
+      console.log(`[STORAGE] Photo saved. OCR bypassed by user: ${req.file.path}`);
+      return res.json({
+        imagePath: `/uploads/${req.file.filename}`,
+        rawOcrText: "Smart Scanner bypassed. Manual entry mode.",
+      });
+    }
+
     try {
       if (!visionClient) {
         return res.json({ 
