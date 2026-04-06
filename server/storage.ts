@@ -11,6 +11,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
   
   getReceipt(id: number): Promise<Receipt | undefined>;
   getReceipts(userId: number): Promise<Receipt[]>;
@@ -78,7 +79,12 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.insert(users).values(dataToInsert).returning();
     return user;
   }
-
+  
+  async getAllUsers(): Promise<User[]> {
+    // Grabs every user account in the database
+    return await db.select().from(users);
+  }
+  
   // --- RECEIPT METHODS ---
   async getReceipt(id: number): Promise<Receipt | undefined> {
     const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id));
