@@ -46,6 +46,7 @@ import {
   ArrowUpDown,
   Download,
   User as UserIcon
+  Image as ImageIcon
 } from "lucide-react";
 
 export default function ReceiptsPage() {
@@ -69,6 +70,8 @@ export default function ReceiptsPage() {
     jobId: "",
     notes: "",
   });
+ 
+  const [viewingImage, setViewingImage] = useState<{url: string, merchant: string} | null>(null);
   
   // Build query string from filters
   const buildQueryString = () => {
@@ -609,6 +612,33 @@ export default function ReceiptsPage() {
               <Button onClick={handleSaveEdit}>
                 Save Changes
               </Button>
+            </div>
+          </div>
+        </div>
+
+      {/* ── Image Viewer Modal ── */}
+      {viewingImage && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4" 
+          onClick={() => setViewingImage(null)} // Click background to close
+        >
+          <div 
+            className="w-full max-w-3xl rounded-lg bg-white p-4 shadow-xl" 
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{viewingImage.merchant} - Scanned Receipt</h3>
+              <button onClick={() => setViewingImage(null)} className="text-sm font-medium text-muted-foreground hover:text-black">
+                Close
+              </button>
+            </div>
+            
+            <div className="flex justify-center bg-gray-100 rounded border border-gray-200 p-2">
+              <img 
+                src={viewingImage.url} 
+                alt="Receipt Scan" 
+                className="max-h-[70vh] object-contain rounded"
+              />
             </div>
           </div>
         </div>
