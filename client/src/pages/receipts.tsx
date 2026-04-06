@@ -502,7 +502,7 @@ export default function ReceiptsPage() {
         </CardContent>
       </Card>
       
-      {/* ── Edit Modal ── */}
+    {/* ── Edit Modal ── */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
@@ -615,16 +615,17 @@ export default function ReceiptsPage() {
             </div>
           </div>
         </div>
+      )}
 
       {/* ── Image Viewer Modal ── */}
       {viewingImage && (
         <div 
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4" 
-          onClick={() => setViewingImage(null)} // Click background to close
+          onClick={() => setViewingImage(null)} 
         >
           <div 
             className="w-full max-w-3xl rounded-lg bg-white p-4 shadow-xl" 
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself
+            onClick={(e) => e.stopPropagation()} 
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">{viewingImage.merchant} - Scanned Receipt</h3>
@@ -643,6 +644,7 @@ export default function ReceiptsPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
