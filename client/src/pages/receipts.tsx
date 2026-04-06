@@ -45,7 +45,7 @@ import {
   ShoppingBag, 
   ArrowUpDown,
   Download,
-  User as UserIcon
+  User as UserIcon,
   Image as ImageIcon
 } from "lucide-react";
 
