@@ -108,7 +108,24 @@ export async function registerRoutes(server: Server, app: Express): Promise<Serv
     return res.json(req.session.user);
   });
 
-// ─── JOBS ROUTES ───
+  // ─── USER ROSTER ROUTE (ADMIN ONLY) ───
+  app.get("/api/users", async (req, res) => {
+    const user = req.session.user;
+    
+    // Security: If they aren't logged in, OR they aren't an admin, kick them out.
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden: Admins only" });
+    }
+    
+    const allUsers = await storage.getAllUsers();
+    
+    // Security: Strip out all passwords before handing the list to the frontend!
+    const safeUsers = allUsers.map(u => ({ id: u.id, username: u.username }));
+    
+    return res.json(safeUsers);
+  });
+  
+  // ─── JOBS ROUTES ───
   app.get("/api/jobs", async (req, res) => {
     const user = req.session.user;
     if (!user) return res.status(401).json({ message: "Not logged in" });
