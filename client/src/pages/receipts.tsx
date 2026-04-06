@@ -3,6 +3,7 @@
  *
  * Shows a filterable table of all past receipts with columns for:
  * date, merchant, job, category, total, gallons.
+ * Admin View: Includes a "Logged By" column and fetches the company roster.
  *
  * Filters: date range, job, category (Fuel / Other).
  * Sorting: Newest First, Oldest First.
@@ -43,7 +44,8 @@ import {
   Fuel, 
   ShoppingBag, 
   ArrowUpDown,
-  Download
+  Download,
+  User as UserIcon
 } from "lucide-react";
 
 export default function ReceiptsPage() {
@@ -81,6 +83,7 @@ export default function ReceiptsPage() {
 
   // ── Data fetching ──
   const { data: user } = useQuery<any>({ queryKey: ["/api/me"] });
+  const isAdmin = user?.role === "admin"; // Check if the current user is the boss
   
   const {
     data: receipts,
@@ -97,7 +100,15 @@ export default function ReceiptsPage() {
     queryKey: ["/api/jobs"],
   });
 
+  // THE FIX: Fetch the roster ONLY if the user has an Admin badge
+  const { data: allUsers } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    enabled: isAdmin, 
+  });
+
   const jobMap = new Map(allJobs?.map((j) => [j.id, j.jobName]) ?? []);
+  // THE FIX: Build a translation dictionary to map User IDs to Usernames
+  const userMap = new Map(allUsers?.map((u) => [u.id, u.username]) ?? []);
 
   const clearFilters = () => {
     setStartDate("");
@@ -109,12 +120,8 @@ export default function ReceiptsPage() {
 
   const setFilterToCurrentMonth = () => {
     const now = new Date();
-    // 1st day of the current month
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    // 1st day of NEXT month, minus 1 millisecond = last day of current month
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    // Format them for the HTML input (YYYY-MM-DD)
     setStartDate(format(firstDay, "yyyy-MM-dd"));
     setEndDate(format(lastDay, "yyyy-MM-dd"));
   };
@@ -202,54 +209,45 @@ export default function ReceiptsPage() {
     window.location.reload();
   };
   
-  // THE FIX: The Front-Desk Sorter
-  // 1. Throw out any receipts that don't match the active filters
+  // The Front-Desk Sorter
   const filteredReceipts = receipts ? receipts.filter(r => {
-    // Grab the date string (YYYY-MM-DD)
     const dateStr = r.purchaseDate || (r.createdAt ? r.createdAt.substring(0, 10) : "");
-    
-    // Check Date Range
     if (startDate && dateStr < startDate) return false;
     if (endDate && dateStr > endDate) return false;
-    
-    // Check Job Filter
     if (jobFilter !== "all" && String(r.jobId) !== jobFilter) return false;
-    
-    // Check Category Filter
     if (categoryFilter !== "all" && r.category !== categoryFilter) return false;
-    
-    return true; // If it passes all tests, keep it
+    return true; 
   }) : [];
 
-  // 2. Sort the remaining valid receipts by date
   const sortedReceipts = [...filteredReceipts].sort((a, b) => {
     const dateA = new Date(a.purchaseDate || a.createdAt).getTime();
     const dateB = new Date(b.purchaseDate || b.createdAt).getTime();
     return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
   });
 
-  // THE FIX: The CSV Exporter Logic
   const handleExportCSV = () => {
     if (!sortedReceipts || sortedReceipts.length === 0) {
       toast({ title: "No receipts to export", variant: "destructive" });
       return;
     }
 
-   // 1. Build the company header block
     const userName = user?.fullName || user?.username || "Account Holder";
+    
+    // THE FIX: Conditionally add the "Logged By" column to the CSV header for Admins
+    const csvHeaderRow = isAdmin 
+      ? `"Date","Purchased From","Job","Description/Fuel Type","Fuel Gallons","Amount","Logged By"`
+      : `"Date","Purchased From","Job","Description/Fuel Type","Fuel Gallons","Amount"`;
+
     const headerRows = [
       `"Mountain View Development & Contracting Co., Inc."`,
       `"Expense Tracker"`,
       `"Name: ${userName}"`,
-      `""`, // Blank line for spacing
-      `"Date","Purchased From","Job","Description/Fuel Type","Fuel Gallons","Amount"`
+      `""`, 
+      csvHeaderRow
     ];
 
-    // 2. Loop through the currently filtered receipts and map them to columns
     const dataRows = sortedReceipts.map((r) => {
       const date = r.purchaseDate ? format(parseISO(r.purchaseDate), "MM/dd/yyyy") : "";
-      
-      // Quotes and .replace prevent commas inside the text from breaking the CSV layout
       const merchant = `"${(r.merchant || "").replace(/"/g, '""')}"`;
       const job = `"${(jobMap.get(r.jobId) || "").replace(/"/g, '""')}"`;
       
@@ -262,10 +260,14 @@ export default function ReceiptsPage() {
       const gallons = r.gallons != null ? r.gallons : "";
       const amount = r.total != null ? r.total : "";
 
-      return `${date},${merchant},${job},${cleanDesc},${gallons},${amount}`;
+      // THE FIX: Conditionally pull the uploader's name for the CSV row if Admin
+      const loggedByData = isAdmin 
+        ? `,"${(userMap.get(r.userId) || `ID #${r.userId}`).replace(/"/g, '""')}"` 
+        : "";
+
+      return `${date},${merchant},${job},${cleanDesc},${gallons},${amount}${loggedByData}`;
     });
 
-    // 3. Assemble the file and trigger the browser download
     const csvContent = [...headerRows, ...dataRows].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -283,7 +285,7 @@ export default function ReceiptsPage() {
   const hasFilters = startDate || endDate || jobFilter !== "all" || categoryFilter !== "all";
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <div className="space-y-4 max-w-6xl">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -291,11 +293,10 @@ export default function ReceiptsPage() {
             Receipts
           </h2>
           <p className="text-sm text-muted-foreground">
-            {receipts ? `${receipts.length} receipt${receipts.length !== 1 ? "s" : ""}` : "Loading..."}
+            {receipts ? `${filteredReceipts.length} receipt${filteredReceipts.length !== 1 ? "s" : ""}` : "Loading..."}
           </p>
         </div>
         
-        {/* THE FIX: Added the Export Button next to the New Receipt Button */}
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportCSV} className="bg-white">
             <Download className="h-4 w-4 mr-1.5" />
@@ -400,8 +401,7 @@ export default function ReceiptsPage() {
                 Clear all filters
               </Button>
             )}
-          </div> {/* <-- THE FIX: This closing div was missing! */}
-          
+          </div>
         </CardContent>
       </Card>
 
@@ -421,11 +421,13 @@ export default function ReceiptsPage() {
                   <TableRow>
                     <TableHead className="w-[110px] whitespace-nowrap">Date</TableHead>
                     <TableHead>Merchant</TableHead>
+                    {/* THE FIX: Show "Logged By" column header ONLY to Admin */}
+                    {isAdmin && <TableHead className="w-[120px]">Logged By</TableHead>}
                     <TableHead>Job</TableHead>
                     <TableHead className="w-[90px]">Category</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Total</TableHead>
                     <TableHead className="w-[100px] text-right whitespace-nowrap">Gallons</TableHead>
-                    <TableHead className="min-w-[220px]">Notes</TableHead>
+                    <TableHead className="min-w-[200px]">Notes</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow> 
                 </TableHeader>                
@@ -440,6 +442,15 @@ export default function ReceiptsPage() {
                       <TableCell className="text-sm font-medium">
                         {r.merchant || "Unknown"}
                       </TableCell>
+                      
+                      {/* THE FIX: Show the Uploader's Username ONLY to Admin */}
+                      {isAdmin && (
+                        <TableCell className="text-sm text-muted-foreground flex items-center gap-1.5 mt-2.5">
+                          <UserIcon className="h-3 w-3" />
+                          {userMap.get(r.userId) || `ID #${r.userId}`}
+                        </TableCell>
+                      )}
+
                       <TableCell className="text-sm text-muted-foreground">
                         {jobMap.get(r.jobId) || `Job #${r.jobId}`}
                       </TableCell>
