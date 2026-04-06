@@ -43,19 +43,28 @@ export class DatabaseStorage implements IStorage {
     this.seedAdmin();
   }
 
-  private async seedAdmin() {
+private async seedAdmin() {
     try {
-      const [admin] = await db.select().from(users).where(eq(users.username, "admin"));
-      const hashedPassword = await bcrypt.hash("changeme123", 10);
-
-      if (!admin) {
-        await this.createUser({ username: "admin", password: hashedPassword, password_hash: hashedPassword } as any);
-      } else {
-        await db.delete(users).where(eq(users.username, "admin"));
-        await this.createUser({ username: "admin", password: hashedPassword, password_hash: hashedPassword } as any);
+      // --- 1. Original Admin Account ---
+      const [admin1] = await db.select().from(users).where(eq(users.username, "admin"));
+      
+      if (!admin1) {
+        const hashed1 = await bcrypt.hash("changeme123", 10);
+        // We explicitly stamp the role as "admin" so the security gates recognize it
+        await this.createUser({ username: "admin", password: hashed1, password_hash: hashed1, role: "admin" } as any);
       }
+      // (Notice we removed the "else" block! Now your password won't get reset every time the server restarts)
+
+      // --- 2. New Secondary Admin Account ---
+      const [admin2] = await db.select().from(users).where(eq(users.username, "Admin"));
+      
+      if (!admin2) {
+        const hashed2 = await bcrypt.hash("Mvdcc123", 10);
+        await this.createUser({ username: "Admin", password: hashed2, password_hash: hashed2, role: "admin" } as any);
+      }
+
     } catch (error) {
-      console.error("Error seeding admin:", error);
+      console.error("Error seeding admins:", error);
     }
   }
 
